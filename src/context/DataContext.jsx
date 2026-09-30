@@ -1,23 +1,35 @@
 import { createContext, useContext, useEffect } from 'react';
-import { useLocalStorageState } from '../hooks/useLocalStorageState';
+import { useUserData } from '../hooks/useUserData';
+import { useAuth } from './AuthContext';
 import { dedupeShifts, dedupeCommutes } from '../lib/commute';
 
 const DataContext = createContext(null);
 
 export function DataProvider({ children }) {
-  const [shifts, setShifts] = useLocalStorageState('pt_shifts', []);
-  const [commutes, setCommutes] = useLocalStorageState('pt_commutes', []);
-  const [holidays, setHolidays] = useLocalStorageState('pt_holidays', []);
+  const { user } = useAuth();
+  const [data, setData, loading] = useUserData(user?.uid ?? null);
+  const { shifts, commutes, holidays } = data;
 
-  // Clean up any duplicates left over from before dupe-checks existed, once on load.
+  function setShifts(updater) {
+    setData(prev => ({ ...prev, shifts: typeof updater === 'function' ? updater(prev.shifts) : updater }));
+  }
+  function setCommutes(updater) {
+    setData(prev => ({ ...prev, commutes: typeof updater === 'function' ? updater(prev.commutes) : updater }));
+  }
+  function setHolidays(updater) {
+    setData(prev => ({ ...prev, holidays: typeof updater === 'function' ? updater(prev.holidays) : updater }));
+  }
+
+  // Clean up any duplicates left over from before dupe-checks existed, once data loads.
   useEffect(() => {
+    if (loading) return;
     setShifts(prev => dedupeShifts(prev));
     setCommutes(prev => dedupeCommutes(prev));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loading]);
 
   const value = {
-    shifts, commutes, holidays,
+    shifts, commutes, holidays, loading,
     addShift(entry) { setShifts(prev => [...prev, entry]); },
     updateShift(id, entry) { setShifts(prev => prev.map(s => (s.id === id ? entry : s))); },
     deleteShift(id) { setShifts(prev => prev.filter(s => s.id !== id)); },
@@ -58,3 +70,4 @@ export function useData() {
   if (!ctx) throw new Error('useData must be used within a DataProvider');
   return ctx;
 }
+

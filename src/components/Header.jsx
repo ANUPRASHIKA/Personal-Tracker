@@ -6,7 +6,7 @@ const TABS = [
   { key: 'settings', label: 'Settings' },
 ];
 
-export default function Header({ activeTab, onChangeTab }) {
+export default function Header({ activeTab, onChangeTab, user, onSignOut }) {
   return (
     <header className="app-header">
       <div className="brand">
@@ -24,6 +24,12 @@ export default function Header({ activeTab, onChangeTab }) {
           </button>
         ))}
       </nav>
+      {user && (
+        <div className="user-menu">
+          <span className="user-name">{user.displayName || user.email}</span>
+          <button className="btn btn-small btn-secondary" onClick={onSignOut}>Sign out</button>
+        </div>
+      )}
     </header>
   );
 }
