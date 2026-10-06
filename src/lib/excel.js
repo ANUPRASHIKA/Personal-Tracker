@@ -49,7 +49,7 @@ export function importExcel(file) {
       }
       if (wb.Sheets['Commutes']) {
         result.commutes = XLSX.utils.sheet_to_json(wb.Sheets['Commutes']).map(r => ({
-          id: String(r.id || cryptoId()), date: normalizeExcelDate(r.date), type: r.type === 'other' ? 'other' : 'commute',
+          id: String(r.id || cryptoId()), date: normalizeExcelDate(r.date), type: r.type && r.type !== 'commute' ? String(r.type) : 'commute',
           period: r.period || null, route: r.route || null, routeRemark: r.routeRemark ? String(r.routeRemark) : '',
           mode: r.mode || null, modeRemark: r.modeRemark ? String(r.modeRemark) : '', payment: r.payment, paymentRemark: r.paymentRemark ? String(r.paymentRemark) : '',
           fare: Number(r.fare) || 0, notes: r.notes ? String(r.notes) : '',

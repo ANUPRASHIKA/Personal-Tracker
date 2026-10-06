@@ -4,7 +4,7 @@ import { useToast } from '../context/ToastContext';
 import { todayStr } from '../lib/dates';
 import { uid } from '../lib/id';
 import {
-  FARE_DEFAULTS, ROUTE_DEFAULTS, modeText, paymentText, groupCommutesByDate,
+  FARE_DEFAULTS, ROUTE_DEFAULTS, modeText, paymentText, groupCommutesByDate, categoryText, totalsByCategory, isOtherExpense, ALL_CATEGORY_LABELS,
 } from '../lib/commute';
 import { useSortFilter } from '../hooks/useSortFilter';
 import SortableTh from '../components/SortableTh';
@@ -21,7 +21,7 @@ function EntryCell({ entry, onEdit, onDelete }) {
   if (!entry) return <span className="muted">–</span>;
   return (
     <>
-      <div>{entry.type === 'other' ? (entry.notes || 'Other') : modeText(entry)} · {paymentText(entry)} · ₹{entry.fare}</div>
+      <div>{isOtherExpense(entry) ? (entry.notes || categoryText(entry)) : modeText(entry)} · {paymentText(entry)} · ₹{entry.fare}</div>
       <div className="row-actions">
         <button className="btn btn-small" onClick={() => onEdit(entry)}>Edit</button>
         <button className="btn btn-small btn-danger" onClick={() => onDelete(entry.id)}>Del</button>
@@ -34,7 +34,7 @@ function OtherCell({ entries, onEdit, onDelete }) {
   if (!entries.length) return <span className="muted">–</span>;
   return entries.map((entry, i) => (
     <div key={entry.id} style={i > 0 ? { borderTop: '1px solid var(--border)', marginTop: '0.4rem', paddingTop: '0.4rem' } : undefined}>
-      <div>{entry.notes || 'Other'} · {paymentText(entry)} · ₹{entry.fare}</div>
+      <div>{entry.notes || categoryText(entry)} · {paymentText(entry)} · ₹{entry.fare}</div>
       <div className="row-actions">
         <button className="btn btn-small" onClick={() => onEdit(entry)}>Edit</button>
         <button className="btn btn-small btn-danger" onClick={() => onDelete(entry.id)}>Del</button>
@@ -49,7 +49,7 @@ export default function CommuteLog() {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
 
-  const isOther = form.type === 'other';
+  const isOther = form.type !== 'commute';
 
   function resetForm() {
     setEditingId(null);
@@ -68,9 +68,9 @@ export default function CommuteLog() {
   }
 
   function remove(id) {
-    if (!confirm('Delete this commute entry?')) return;
+    if (!confirm('Delete this expense entry?')) return;
     deleteCommute(id);
-    showToast('Commute entry deleted');
+    showToast('Expense entry deleted');
   }
 
   function changePeriod(period) {
@@ -94,7 +94,7 @@ export default function CommuteLog() {
       notes,
     };
     const entry = isOther
-      ? { ...common, type: 'other', period: null, route: null, routeRemark: '', mode: null, modeRemark: '' }
+      ? { ...common, type: form.type, period: null, route: null, routeRemark: '', mode: null, modeRemark: '' }
       : {
         ...common,
         type: 'commute',
@@ -108,14 +108,16 @@ export default function CommuteLog() {
     if (dupe) { showToast(`A ${entry.period} commute entry already exists for this date — edit that one instead`); return; }
     if (editingId) updateCommute(editingId, entry); else addCommute(entry);
     resetForm();
-    showToast('Commute entry saved');
+    showToast('Expense entry saved');
   }
 
   const groups = useMemo(() => groupCommutesByDate(commutes), [commutes]);
+  const categoryTotals = useMemo(() => totalsByCategory(commutes), [commutes]);
+  const categoryTotalSum = useMemo(() => Object.values(categoryTotals).reduce((s, v) => s + v, 0), [categoryTotals]);
 
   function entryText(entry) {
     if (!entry) return '';
-    return `${entry.type === 'other' ? (entry.notes || 'Other') : modeText(entry)} ${paymentText(entry)} ${entry.fare} ${entry.notes || ''}`;
+    return `${isOtherExpense(entry) ? categoryText(entry) : modeText(entry)} ${paymentText(entry)} ${entry.fare} ${entry.notes || ''}`;
   }
   const groupSearchText = g => `${g.date} ${entryText(g.morning)} ${entryText(g.evening)} ${g.other.map(entryText).join(' ')} ${g.total}`;
   const groupSorters = { date: g => g.date, total: g => g.total };
@@ -126,7 +128,7 @@ export default function CommuteLog() {
   return (
     <section>
       <div className="card">
-        <h3>{editingId ? 'Edit Commute Entry' : 'Add Commute Entry'}</h3>
+        <h3>{editingId ? 'Edit Expense Entry' : 'Add Expense Entry'}</h3>
         <form className="form-grid" onSubmit={submit}>
           <label>Date
             <input type="date" required value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
@@ -135,6 +137,8 @@ export default function CommuteLog() {
             <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
               <option value="commute">Commute</option>
               <option value="other">Other Expense</option>
+              <option value="amazon-mine">My Amazon Expenses</option>
+              <option value="amazon-parents">Parents Expense</option>
             </select>
           </label>
 
@@ -206,7 +210,22 @@ export default function CommuteLog() {
       </div>
 
       <div className="card">
-        <h3>All Commute Entries</h3>
+        <h3>Expense Totals by Category</h3>
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>Category</th><th>Total ₹</th></tr></thead>
+            <tbody>
+              {ALL_CATEGORY_LABELS.map(label => (
+                <tr key={label}><td>{label}</td><td>₹{categoryTotals[label] || 0}</td></tr>
+              ))}
+              <tr><td><strong>Total</strong></td><td><strong>₹{categoryTotalSum}</strong></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="card">
+        <h3>All Expense Entries</h3>
         <input className="table-filter" type="text" placeholder="Filter entries…" value={search} onChange={e => setSearch(e.target.value)} />
         <div className="table-wrap">
           <table>
@@ -215,7 +234,9 @@ export default function CommuteLog() {
                 <SortableTh label="Date" sortKey="date" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
                 <th>Morning</th>
                 <th>Evening</th>
-                <th>Other</th>
+                <th>Other Expense</th>
+                <th>My Amazon</th>
+                <th>Parents Expense</th>
                 <SortableTh label="Total ₹" sortKey="total" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
               </tr>
             </thead>
@@ -225,10 +246,12 @@ export default function CommuteLog() {
                   <td>{g.date}</td>
                   <td className="wrap-cell"><EntryCell entry={g.morning} onEdit={edit} onDelete={remove} /></td>
                   <td className="wrap-cell"><EntryCell entry={g.evening} onEdit={edit} onDelete={remove} /></td>
-                  <td className="wrap-cell"><OtherCell entries={g.other} onEdit={edit} onDelete={remove} /></td>
+                  <td className="wrap-cell"><OtherCell entries={g.other.filter(o => o.type === 'other')} onEdit={edit} onDelete={remove} /></td>
+                  <td className="wrap-cell"><OtherCell entries={g.other.filter(o => o.type === 'amazon-mine')} onEdit={edit} onDelete={remove} /></td>
+                  <td className="wrap-cell"><OtherCell entries={g.other.filter(o => o.type === 'amazon-parents')} onEdit={edit} onDelete={remove} /></td>
                   <td>₹{g.total}</td>
                 </tr>
-              )) : <tr><td colSpan={5} className="muted">No commute entries yet</td></tr>}
+              )) : <tr><td colSpan={7} className="muted">No expense entries yet</td></tr>}
             </tbody>
           </table>
         </div>
