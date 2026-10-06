@@ -5,11 +5,12 @@ import {
   sumNetHours, completedShiftsCount, holidaySet, rangeWorkdayInfo, targetLabel, weeklyStatus,
 } from '../lib/shift';
 import { sumFare } from '../lib/commute';
-import { downloadCsv, SHIFT_CSV_COLUMNS, COMMUTE_CSV_COLUMNS } from '../lib/csv';
+import { LEAVE_TYPES } from '../lib/leave';
+import { downloadCsv, SHIFT_CSV_COLUMNS, COMMUTE_CSV_COLUMNS, LEAVE_CSV_COLUMNS, WFH_CSV_COLUMNS } from '../lib/csv';
 import { useToast } from '../context/ToastContext';
 
 export default function MonthlyReport() {
-  const { shifts, commutes, holidays } = useData();
+  const { shifts, commutes, holidays, leaves, wfhLogs } = useData();
   const showToast = useToast();
   const [anchor, setAnchor] = useState(new Date());
 
@@ -60,12 +61,40 @@ export default function MonthlyReport() {
       return { label: weekLabel(start, end), count: list.length, total: sumFare(list) };
     });
 
+    const monthLeaves = leaves.filter(l => l.date.slice(0, 7) === key).sort((a, b) => a.date.localeCompare(b.date));
+    const monthWfh = wfhLogs.filter(w => w.date.slice(0, 7) === key).sort((a, b) => a.date.localeCompare(b.date));
+    const leaveDaysTotal = monthLeaves.reduce((sum, l) => sum + (Number(l.days) || 0), 0);
+
+    const lWeekMap = new Map();
+    monthLeaves.forEach(l => {
+      const wk = toDateStr(startOfWeek(parseDateStr(l.date)));
+      if (!lWeekMap.has(wk)) lWeekMap.set(wk, []);
+      lWeekMap.get(wk).push(l);
+    });
+    const leaveWeekRows = [...lWeekMap.keys()].sort().map(wk => {
+      const start = parseDateStr(wk), end = endOfWeek(start);
+      const list = lWeekMap.get(wk);
+      return { label: weekLabel(start, end), days: list.reduce((sum, l) => sum + (Number(l.days) || 0), 0) };
+    });
+
+    const wWeekMap = new Map();
+    monthWfh.forEach(w => {
+      const wk = toDateStr(startOfWeek(parseDateStr(w.date)));
+      if (!wWeekMap.has(wk)) wWeekMap.set(wk, []);
+      wWeekMap.get(wk).push(w);
+    });
+    const wfhWeekRows = [...wWeekMap.keys()].sort().map(wk => {
+      const start = parseDateStr(wk), end = endOfWeek(start);
+      return { label: weekLabel(start, end), count: wWeekMap.get(wk).length };
+    });
+
     return {
       monthShifts, totalHours, avgPerWeek, avgWorkdaysPerWeek, hasData, status, totalHolidayHits, weekRows,
       monthCommutes, commuteWeekRows,
+      monthLeaves, monthWfh, leaveDaysTotal, leaveWeekRows, wfhWeekRows,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shifts, commutes, holidays, key]);
+  }, [shifts, commutes, holidays, leaves, wfhLogs, key]);
 
   return (
     <div>
@@ -77,6 +106,8 @@ export default function MonthlyReport() {
           <input type="date" title="Jump to date" value={toDateStr(anchor)} onChange={ev => ev.target.value && setAnchor(parseDateStr(ev.target.value))} />
           <button className="btn btn-secondary" onClick={() => { if (!downloadCsv(data.monthShifts, SHIFT_CSV_COLUMNS, 'shift-monthly.csv')) showToast('Nothing to export'); }}>Export Shift CSV</button>
           <button className="btn btn-secondary" onClick={() => { if (!downloadCsv(data.monthCommutes, COMMUTE_CSV_COLUMNS, 'commute-monthly.csv')) showToast('Nothing to export'); }}>Export Commute CSV</button>
+          <button className="btn btn-secondary" onClick={() => { if (!downloadCsv(data.monthLeaves, LEAVE_CSV_COLUMNS, 'leave-monthly.csv')) showToast('Nothing to export'); }}>Export Leave CSV</button>
+          <button className="btn btn-secondary" onClick={() => { if (!downloadCsv(data.monthWfh, WFH_CSV_COLUMNS, 'wfh-monthly.csv')) showToast('Nothing to export'); }}>Export WFH CSV</button>
         </div>
       </div>
 
@@ -116,6 +147,64 @@ export default function MonthlyReport() {
                 {data.commuteWeekRows.length ? data.commuteWeekRows.map(w => (
                   <tr key={w.label}><td>{w.label}</td><td>{w.count}</td><td>₹{w.total}</td></tr>
                 )) : <tr><td colSpan={3} className="muted">No entries this month</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid-2col">
+        <div className="card report-card report-card--leave">
+          <h3>Leave Summary (by week)</h3>
+          <div className="summary-line">
+            <span>Total Days: <strong className="stat-accent-purple">{data.leaveDaysTotal.toFixed(2)}</strong></span>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Week</th><th>Days</th></tr></thead>
+              <tbody>
+                {data.leaveWeekRows.length ? data.leaveWeekRows.map(w => (
+                  <tr key={w.label}><td>{w.label}</td><td>{w.days.toFixed(2)}</td></tr>
+                )) : <tr><td colSpan={2} className="muted">No entries this month</td></tr>}
+              </tbody>
+            </table>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Date</th><th>Type</th><th>Days</th><th>Notes</th></tr></thead>
+              <tbody>
+                {data.monthLeaves.length ? data.monthLeaves.map(l => (
+                  <tr key={l.id}>
+                    <td>{l.date}</td><td>{LEAVE_TYPES[l.type] || l.type}</td><td>{l.days}</td><td>{l.notes}</td>
+                  </tr>
+                )) : <tr><td colSpan={4} className="muted">No entries this month</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="card report-card report-card--wfh">
+          <h3>WFH Summary (by week)</h3>
+          <div className="summary-line">
+            <span>Total Days: <strong className="stat-accent-teal">{data.monthWfh.length}</strong></span>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Week</th><th>Days</th></tr></thead>
+              <tbody>
+                {data.wfhWeekRows.length ? data.wfhWeekRows.map(w => (
+                  <tr key={w.label}><td>{w.label}</td><td>{w.count}</td></tr>
+                )) : <tr><td colSpan={2} className="muted">No entries this month</td></tr>}
+              </tbody>
+            </table>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Date</th><th>Notes</th></tr></thead>
+              <tbody>
+                {data.monthWfh.length ? data.monthWfh.map(w => (
+                  <tr key={w.id}><td>{w.date}</td><td>{w.notes}</td></tr>
+                )) : <tr><td colSpan={2} className="muted">No entries this month</td></tr>}
               </tbody>
             </table>
           </div>

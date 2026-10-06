@@ -6,6 +6,8 @@ import { uid } from '../lib/id';
 import {
   FARE_DEFAULTS, ROUTE_DEFAULTS, modeText, paymentText, groupCommutesByDate,
 } from '../lib/commute';
+import { useSortFilter } from '../hooks/useSortFilter';
+import SortableTh from '../components/SortableTh';
 
 const EMPTY_FORM = {
   date: todayStr(), type: 'commute',
@@ -109,7 +111,17 @@ export default function CommuteLog() {
     showToast('Commute entry saved');
   }
 
-  const groups = useMemo(() => groupCommutesByDate(commutes).sort((a, b) => b.date.localeCompare(a.date)), [commutes]);
+  const groups = useMemo(() => groupCommutesByDate(commutes), [commutes]);
+
+  function entryText(entry) {
+    if (!entry) return '';
+    return `${entry.type === 'other' ? (entry.notes || 'Other') : modeText(entry)} ${paymentText(entry)} ${entry.fare} ${entry.notes || ''}`;
+  }
+  const groupSearchText = g => `${g.date} ${entryText(g.morning)} ${entryText(g.evening)} ${g.other.map(entryText).join(' ')} ${g.total}`;
+  const groupSorters = { date: g => g.date, total: g => g.total };
+  const { search, setSearch, sortKey, sortDir, toggleSort, rows: sortedGroups } = useSortFilter(
+    groups, groupSearchText, groupSorters, { key: 'date', dir: 'desc' },
+  );
 
   return (
     <section>
@@ -195,11 +207,20 @@ export default function CommuteLog() {
 
       <div className="card">
         <h3>All Commute Entries</h3>
+        <input className="table-filter" type="text" placeholder="Filter entries…" value={search} onChange={e => setSearch(e.target.value)} />
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Date</th><th>Morning</th><th>Evening</th><th>Other</th><th>Total ₹</th></tr></thead>
+            <thead>
+              <tr>
+                <SortableTh label="Date" sortKey="date" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
+                <th>Morning</th>
+                <th>Evening</th>
+                <th>Other</th>
+                <SortableTh label="Total ₹" sortKey="total" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
+              </tr>
+            </thead>
             <tbody>
-              {groups.length ? groups.map(g => (
+              {sortedGroups.length ? sortedGroups.map(g => (
                 <tr key={g.date}>
                   <td>{g.date}</td>
                   <td className="wrap-cell"><EntryCell entry={g.morning} onEdit={edit} onDelete={remove} /></td>

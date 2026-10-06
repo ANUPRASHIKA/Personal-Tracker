@@ -1,5 +1,6 @@
 import { computeNetMinutes } from './shift';
 import { isOtherExpense, routeText, modeText, paymentText } from './commute';
+import { LEAVE_TYPES } from './leave';
 
 export const SHIFT_CSV_COLUMNS = [
   { key: 'date', label: 'Date' },
@@ -19,6 +20,18 @@ export const COMMUTE_CSV_COLUMNS = [
   { key: r => isOtherExpense(r) ? '' : modeText(r), label: 'Mode' },
   { key: r => paymentText(r), label: 'Payment' },
   { key: 'fare', label: 'Fare / Amount' },
+  { key: 'notes', label: 'Notes' },
+];
+
+export const LEAVE_CSV_COLUMNS = [
+  { key: 'date', label: 'Date' },
+  { key: r => LEAVE_TYPES[r.type] || r.type, label: 'Type' },
+  { key: 'days', label: 'Days' },
+  { key: 'notes', label: 'Notes' },
+];
+
+export const WFH_CSV_COLUMNS = [
+  { key: 'date', label: 'Date' },
   { key: 'notes', label: 'Notes' },
 ];
 

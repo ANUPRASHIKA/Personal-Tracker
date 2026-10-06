@@ -2,6 +2,7 @@ const TABS = [
   { key: 'dashboard', label: 'Dashboard' },
   { key: 'shift', label: 'Shift Log' },
   { key: 'commute', label: 'Commute Log' },
+  { key: 'leave', label: 'Leave & WFH' },
   { key: 'reports', label: 'Reports' },
   { key: 'settings', label: 'Settings' },
 ];

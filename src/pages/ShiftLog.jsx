@@ -4,6 +4,8 @@ import { useToast } from '../context/ToastContext';
 import { todayStr } from '../lib/dates';
 import { computeNetMinutes, minutesToHoursLabel } from '../lib/shift';
 import { uid } from '../lib/id';
+import { useSortFilter } from '../hooks/useSortFilter';
+import SortableTh from '../components/SortableTh';
 
 const EMPTY_FORM = { date: todayStr(), punchIn: '09:00', punchOut: '17:00', breakMin: 60, callMin: 0, notes: '' };
 
@@ -55,9 +57,18 @@ export default function ShiftLog() {
     showToast('Shift entry saved');
   }
 
-  const sorted = useMemo(
-    () => [...shifts].sort((a, b) => b.date.localeCompare(a.date) || (b.punchIn || '').localeCompare(a.punchIn || '')),
-    [shifts],
+  const shiftSearchText = s => `${s.date} ${s.punchIn || ''} ${s.punchOut || ''} ${s.breakMin} ${s.callMin} ${s.notes || ''}`;
+  const shiftSorters = {
+    date: s => s.date,
+    punchIn: s => s.punchIn || '',
+    punchOut: s => s.punchOut || '',
+    breakMin: s => Number(s.breakMin) || 0,
+    callMin: s => Number(s.callMin) || 0,
+    netHrs: s => { const m = computeNetMinutes(s); return m == null ? -Infinity : m; },
+    notes: s => s.notes || '',
+  };
+  const { search, setSearch, sortKey, sortDir, toggleSort, rows: sorted } = useSortFilter(
+    shifts, shiftSearchText, shiftSorters, { key: 'date', dir: 'desc' },
   );
 
   return (
@@ -95,10 +106,20 @@ export default function ShiftLog() {
 
       <div className="card">
         <h3>All Shift Entries</h3>
+        <input className="table-filter" type="text" placeholder="Filter entries…" value={search} onChange={e => setSearch(e.target.value)} />
         <div className="table-wrap">
           <table>
             <thead>
-              <tr><th>Date</th><th>In</th><th>Out</th><th>Break</th><th>Calls</th><th>Net Hrs</th><th>Notes</th><th></th></tr>
+              <tr>
+                <SortableTh label="Date" sortKey="date" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
+                <SortableTh label="In" sortKey="punchIn" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
+                <SortableTh label="Out" sortKey="punchOut" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
+                <SortableTh label="Break" sortKey="breakMin" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
+                <SortableTh label="Calls" sortKey="callMin" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
+                <SortableTh label="Net Hrs" sortKey="netHrs" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
+                <SortableTh label="Notes" sortKey="notes" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
+                <th></th>
+              </tr>
             </thead>
             <tbody>
               {sorted.length ? sorted.map(s => (

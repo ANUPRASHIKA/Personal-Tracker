@@ -4,9 +4,14 @@ import { useToast } from '../context/ToastContext';
 import { todayStr, DOW_SHORT, parseDateStr } from '../lib/dates';
 import { uid } from '../lib/id';
 import { exportExcel, importExcel } from '../lib/excel';
+import { useSortFilter } from '../hooks/useSortFilter';
+import SortableTh from '../components/SortableTh';
 
 export default function Settings() {
-  const { shifts, commutes, holidays, addHoliday, deleteHoliday, dedupeAll, replaceAll, clearAll } = useData();
+  const {
+    shifts, commutes, holidays, addHoliday, deleteHoliday, dedupeAll, replaceAll, clearAll,
+    leaves, wfhLogs, leaveSettings, updateLeaveSettings,
+  } = useData();
   const showToast = useToast();
   const [holidayDate, setHolidayDate] = useState(todayStr());
   const [holidayName, setHolidayName] = useState('');
@@ -29,7 +34,7 @@ export default function Settings() {
   }
 
   function exportJson() {
-    const payload = { shifts, commutes, holidays, exportedAt: new Date().toISOString() };
+    const payload = { shifts, commutes, holidays, leaves, wfhLogs, leaveSettings, exportedAt: new Date().toISOString() };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -47,7 +52,11 @@ export default function Settings() {
       catch (e) { showToast('Invalid backup file'); return; }
       if (!Array.isArray(data.shifts) || !Array.isArray(data.commutes)) { showToast('Backup file is missing expected data'); return; }
       if (!confirm('Import will replace all current data in this tracker. Continue?')) return;
-      replaceAll({ shifts: data.shifts, commutes: data.commutes, holidays: Array.isArray(data.holidays) ? data.holidays : [] });
+      replaceAll({
+        shifts: data.shifts, commutes: data.commutes, holidays: Array.isArray(data.holidays) ? data.holidays : [],
+        leaves: Array.isArray(data.leaves) ? data.leaves : [], wfhLogs: Array.isArray(data.wfhLogs) ? data.wfhLogs : [],
+        leaveSettings: data.leaveSettings,
+      });
       showToast('Backup imported');
     };
     reader.readAsText(file);
@@ -65,19 +74,24 @@ export default function Settings() {
   }
 
   function handleExportExcel() {
-    exportExcel(shifts, commutes, holidays);
+    exportExcel(shifts, commutes, holidays, leaves, wfhLogs);
     showToast('Excel file downloaded');
   }
 
   function handleImportExcel(file) {
     importExcel(file).then(result => {
-      if (!confirm('Import will replace the data for each matching sheet (Shifts / Commutes / Holidays) found in this file. Continue?')) return;
+      if (!confirm('Import will replace the data for each matching sheet (Shifts / Commutes / Holidays / Leaves / WFH) found in this file. Continue?')) return;
       replaceAll(result);
       showToast('Excel data imported');
     }).catch(err => showToast(err.message));
   }
 
   const sortedHolidays = [...holidays].sort((a, b) => a.date.localeCompare(b.date));
+  const holidaySearchText = h => `${h.date} ${DOW_SHORT[(parseDateStr(h.date).getDay() + 6) % 7]} ${h.name}`;
+  const holidaySorters = {
+    date: h => h.date, day: h => DOW_SHORT[(parseDateStr(h.date).getDay() + 6) % 7], name: h => h.name,
+  };
+  const holidayTable = useSortFilter(sortedHolidays, holidaySearchText, holidaySorters, { key: 'date', dir: 'asc' });
 
   return (
     <section>
@@ -95,11 +109,19 @@ export default function Settings() {
             <button type="submit" className="btn btn-primary">Add Holiday</button>
           </div>
         </form>
+        <input className="table-filter" type="text" placeholder="Filter holidays…" value={holidayTable.search} onChange={e => holidayTable.setSearch(e.target.value)} />
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Date</th><th>Day</th><th>Name</th><th></th></tr></thead>
+            <thead>
+              <tr>
+                <SortableTh label="Date" sortKey="date" activeKey={holidayTable.sortKey} dir={holidayTable.sortDir} onSort={holidayTable.toggleSort} />
+                <SortableTh label="Day" sortKey="day" activeKey={holidayTable.sortKey} dir={holidayTable.sortDir} onSort={holidayTable.toggleSort} />
+                <SortableTh label="Name" sortKey="name" activeKey={holidayTable.sortKey} dir={holidayTable.sortDir} onSort={holidayTable.toggleSort} />
+                <th></th>
+              </tr>
+            </thead>
             <tbody>
-              {sortedHolidays.length ? sortedHolidays.map(h => (
+              {holidayTable.rows.length ? holidayTable.rows.map(h => (
                 <tr key={h.id}>
                   <td>{h.date}</td>
                   <td>{DOW_SHORT[(parseDateStr(h.date).getDay() + 6) % 7]}</td>
@@ -109,6 +131,23 @@ export default function Settings() {
               )) : <tr><td colSpan={4} className="muted">No holidays marked yet</td></tr>}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <div className="card">
+        <h3>Leave Policy</h3>
+        <p className="muted">Sick/Casual/Tenure reset each calendar year and don't carry forward. Annual leave carries forward — set the balance/date below to match your company portal whenever you want to re-sync (e.g. after a year-end rollover).</p>
+        <div className="form-grid">
+          <label className="checkbox-label">
+            <input type="checkbox" checked={leaveSettings.tenureEligible} onChange={e => updateLeaveSettings({ tenureEligible: e.target.checked })} />
+            Eligible for tenure leave (5+ years)
+          </label>
+          <label>Annual Leave Opening Balance
+            <input type="number" min="0" step="0.25" value={leaveSettings.annualOpeningBalance} onChange={e => updateLeaveSettings({ annualOpeningBalance: Number(e.target.value) || 0 })} />
+          </label>
+          <label>As Of Date
+            <input type="date" value={leaveSettings.annualOpeningDate} onChange={e => updateLeaveSettings({ annualOpeningDate: e.target.value })} />
+          </label>
         </div>
       </div>
 

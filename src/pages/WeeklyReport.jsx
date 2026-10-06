@@ -7,11 +7,12 @@ import {
   holidaySet, rangeWorkdayInfo, targetLabel, weeklyStatus,
 } from '../lib/shift';
 import { commutesInRange, sumFare, categoryText, groupCommutesByDate, modeText } from '../lib/commute';
-import { downloadCsv, SHIFT_CSV_COLUMNS, COMMUTE_CSV_COLUMNS } from '../lib/csv';
+import { LEAVE_TYPES } from '../lib/leave';
+import { downloadCsv, SHIFT_CSV_COLUMNS, COMMUTE_CSV_COLUMNS, LEAVE_CSV_COLUMNS, WFH_CSV_COLUMNS } from '../lib/csv';
 import { useToast } from '../context/ToastContext';
 
 export default function WeeklyReport() {
-  const { shifts, commutes, holidays } = useData();
+  const { shifts, commutes, holidays, leaves, wfhLogs } = useData();
   const showToast = useToast();
   const [anchor, setAnchor] = useState(new Date());
 
@@ -33,13 +34,19 @@ export default function WeeklyReport() {
       byCategory[key].total += Number(c.fare) || 0;
     });
 
+    const sStr = toDateStr(s), eStr = toDateStr(e);
+    const weekLeaves = leaves.filter(l => l.date >= sStr && l.date <= eStr).sort((a, b) => a.date.localeCompare(b.date));
+    const weekWfh = wfhLogs.filter(w => w.date >= sStr && w.date <= eStr).sort((a, b) => a.date.localeCompare(b.date));
+    const leaveDaysTotal = weekLeaves.reduce((sum, l) => sum + (Number(l.days) || 0), 0);
+
     return {
       weekShifts, totalHours, daysWithData, wkInfo, status,
       weekCommutes, byCategory,
       commuteGroups: groupCommutesByDate(weekCommutes).sort((a, b) => a.date.localeCompare(b.date)),
+      weekLeaves, weekWfh, leaveDaysTotal,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shifts, commutes, holidays, toDateStr(s), toDateStr(e)]);
+  }, [shifts, commutes, holidays, leaves, wfhLogs, toDateStr(s), toDateStr(e)]);
 
   return (
     <div>
@@ -51,6 +58,8 @@ export default function WeeklyReport() {
           <input type="date" title="Jump to date" value={toDateStr(anchor)} onChange={ev => ev.target.value && setAnchor(parseDateStr(ev.target.value))} />
           <button className="btn btn-secondary" onClick={() => { if (!downloadCsv(data.weekShifts, SHIFT_CSV_COLUMNS, 'shift-weekly.csv')) showToast('Nothing to export'); }}>Export Shift CSV</button>
           <button className="btn btn-secondary" onClick={() => { if (!downloadCsv(data.weekCommutes, COMMUTE_CSV_COLUMNS, 'commute-weekly.csv')) showToast('Nothing to export'); }}>Export Commute CSV</button>
+          <button className="btn btn-secondary" onClick={() => { if (!downloadCsv(data.weekLeaves, LEAVE_CSV_COLUMNS, 'leave-weekly.csv')) showToast('Nothing to export'); }}>Export Leave CSV</button>
+          <button className="btn btn-secondary" onClick={() => { if (!downloadCsv(data.weekWfh, WFH_CSV_COLUMNS, 'wfh-weekly.csv')) showToast('Nothing to export'); }}>Export WFH CSV</button>
         </div>
       </div>
 
@@ -106,6 +115,44 @@ export default function WeeklyReport() {
                     <td>₹{g.total}</td>
                   </tr>
                 )) : <tr><td colSpan={5} className="muted">No entries this week</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid-2col">
+        <div className="card report-card report-card--leave">
+          <h3>Leave Summary</h3>
+          <div className="summary-line">
+            <span>Total Days: <strong className="stat-accent-purple">{data.leaveDaysTotal.toFixed(2)}</strong></span>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Date</th><th>Type</th><th>Days</th><th>Notes</th></tr></thead>
+              <tbody>
+                {data.weekLeaves.length ? data.weekLeaves.map(l => (
+                  <tr key={l.id}>
+                    <td>{l.date}</td><td>{LEAVE_TYPES[l.type] || l.type}</td><td>{l.days}</td><td>{l.notes}</td>
+                  </tr>
+                )) : <tr><td colSpan={4} className="muted">No entries this week</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="card report-card report-card--wfh">
+          <h3>WFH Summary</h3>
+          <div className="summary-line">
+            <span>Total Days: <strong className="stat-accent-teal">{data.weekWfh.length}</strong></span>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Date</th><th>Notes</th></tr></thead>
+              <tbody>
+                {data.weekWfh.length ? data.weekWfh.map(w => (
+                  <tr key={w.id}><td>{w.date}</td><td>{w.notes}</td></tr>
+                )) : <tr><td colSpan={2} className="muted">No entries this week</td></tr>}
               </tbody>
             </table>
           </div>

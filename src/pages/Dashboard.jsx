@@ -12,9 +12,10 @@ import {
 import {
   commutesInRange, sumFare, groupCommutesByDate, categoryText, modeText, CATEGORY_DOT_COLORS,
 } from '../lib/commute';
+import { wfhUsage, monthlyWarnings, LEAVE_TYPES, WFH_ANNUAL_CAP } from '../lib/leave';
 
 export default function Dashboard() {
-  const { shifts, commutes, holidays } = useData();
+  const { shifts, commutes, holidays, leaves, wfhLogs } = useData();
 
   const stats = useMemo(() => {
     const today = new Date();
@@ -50,6 +51,12 @@ export default function Dashboard() {
     const weekCommutes = commutesInRange(commutes, wkStart, wkEnd);
     const monthCommutes = commutes.filter(c => c.date.slice(0, 7) === monthKey);
 
+    const monthLeaves = leaves.filter(l => l.date.slice(0, 7) === monthKey);
+    const monthLeaveDays = monthLeaves.reduce((sum, l) => sum + (Number(l.days) || 0), 0);
+    const monthWfhCount = wfhLogs.filter(w => w.date.slice(0, 7) === monthKey).length;
+    const wfh = wfhUsage(wfhLogs);
+    const leaveWarnings = monthlyWarnings(leaves, wfhLogs);
+
     let bannerText = null;
     if (weekHasData && (weekHours < wkBand.low || weekHours > wkBand.high)) {
       const holidayNote = wkInfo.holidayHits > 0 ? ` (${wkInfo.holidayHits} holiday${wkInfo.holidayHits > 1 ? 's' : ''} excluded)` : '';
@@ -63,9 +70,10 @@ export default function Dashboard() {
       weekHours, weekHasData, wStatus, wkInfo,
       avgPerWeek, avgWorkdaysPerWeek, monthHasData, mStatus,
       weekExpense: sumFare(weekCommutes), monthExpense: sumFare(monthCommutes),
+      monthLeaveDays, monthWfhCount, wfhRemaining: wfh.remaining, leaveWarnings,
       bannerText,
     };
-  }, [shifts, commutes, holidays]);
+  }, [shifts, commutes, holidays, leaves, wfhLogs]);
 
   const hoursBars = useMemo(() => {
     const today = new Date();
@@ -119,10 +127,13 @@ export default function Dashboard() {
     () => groupCommutesByDate(commutes).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5),
     [commutes],
   );
+  const recentLeaves = useMemo(() => [...leaves].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5), [leaves]);
+  const recentWfh = useMemo(() => [...wfhLogs].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5), [wfhLogs]);
 
   return (
     <section>
       {stats.bannerText && <div className="banner banner-warn">{stats.bannerText}</div>}
+      {stats.leaveWarnings.map(w => <div className="banner banner-warn" key={w}>{w}</div>)}
 
       <QuickPunch />
 
@@ -154,6 +165,16 @@ export default function Dashboard() {
         <div className="card stat-card">
           <span className="stat-label">This Month Commute Spend</span>
           <span className="stat-value">₹{stats.monthExpense}</span>
+        </div>
+        <div className="card stat-card">
+          <span className="stat-label">This Month Leaves</span>
+          <span className="stat-value">{stats.monthLeaveDays}</span>
+          <span className="muted">days taken</span>
+        </div>
+        <div className="card stat-card">
+          <span className="stat-label">This Month WFH</span>
+          <span className="stat-value">{stats.monthWfhCount}</span>
+          <span className="muted">{stats.wfhRemaining} remaining of {WFH_ANNUAL_CAP}/yr</span>
         </div>
       </div>
 
@@ -212,6 +233,39 @@ export default function Dashboard() {
                     <td>₹{g.total}</td>
                   </tr>
                 )) : <tr><td colSpan={5} className="muted">No entries yet</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid-2col">
+        <div className="card">
+          <h3>Recent Leave Entries</h3>
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Date</th><th>Type</th><th>Days</th></tr></thead>
+              <tbody>
+                {recentLeaves.length ? recentLeaves.map(l => (
+                  <tr key={l.id}>
+                    <td>{l.date}</td><td>{LEAVE_TYPES[l.type] || l.type}</td><td>{l.days}</td>
+                  </tr>
+                )) : <tr><td colSpan={3} className="muted">No entries yet</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className="card">
+          <h3>Recent WFH Entries</h3>
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Date</th><th>Notes</th></tr></thead>
+              <tbody>
+                {recentWfh.length ? recentWfh.map(w => (
+                  <tr key={w.id}>
+                    <td>{w.date}</td><td>{w.notes}</td>
+                  </tr>
+                )) : <tr><td colSpan={2} className="muted">No entries yet</td></tr>}
               </tbody>
             </table>
           </div>

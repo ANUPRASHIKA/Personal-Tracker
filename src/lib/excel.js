@@ -12,14 +12,18 @@ function normalizeExcelTime(val) {
   return String(val);
 }
 
-export function exportExcel(shifts, commutes, holidays) {
+export function exportExcel(shifts, commutes, holidays, leaves = [], wfhLogs = []) {
   const wb = XLSX.utils.book_new();
   const shiftRows = shifts.map(s => ({ id: s.id, date: s.date, punchIn: s.punchIn || '', punchOut: s.punchOut || '', breakMin: s.breakMin, callMin: s.callMin, notes: s.notes || '' }));
   const commuteRows = commutes.map(c => ({ id: c.id, date: c.date, type: c.type || 'commute', period: c.period || '', route: c.route || '', routeRemark: c.routeRemark || '', mode: c.mode || '', modeRemark: c.modeRemark || '', payment: c.payment, paymentRemark: c.paymentRemark || '', fare: c.fare, notes: c.notes || '' }));
   const holidayRows = holidays.map(h => ({ id: h.id, date: h.date, name: h.name }));
+  const leaveRows = leaves.map(l => ({ id: l.id, date: l.date, type: l.type, days: l.days, notes: l.notes || '' }));
+  const wfhRows = wfhLogs.map(w => ({ id: w.id, date: w.date, notes: w.notes || '' }));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(shiftRows), 'Shifts');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(commuteRows), 'Commutes');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(holidayRows), 'Holidays');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(leaveRows), 'Leaves');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(wfhRows), 'WFH');
   XLSX.writeFile(wb, `personal-tracker-${todayStr()}.xlsx`);
 }
 
@@ -32,8 +36,8 @@ export function importExcel(file) {
       let wb;
       try { wb = XLSX.read(reader.result, { type: 'array' }); }
       catch (e) { reject(new Error('Could not read that Excel file')); return; }
-      if (!wb.Sheets['Shifts'] && !wb.Sheets['Commutes'] && !wb.Sheets['Holidays']) {
-        reject(new Error('No Shifts/Commutes/Holidays sheet found in that file'));
+      if (!wb.Sheets['Shifts'] && !wb.Sheets['Commutes'] && !wb.Sheets['Holidays'] && !wb.Sheets['Leaves'] && !wb.Sheets['WFH']) {
+        reject(new Error('No Shifts/Commutes/Holidays/Leaves/WFH sheet found in that file'));
         return;
       }
       const result = {};
@@ -53,6 +57,16 @@ export function importExcel(file) {
       }
       if (wb.Sheets['Holidays']) {
         result.holidays = XLSX.utils.sheet_to_json(wb.Sheets['Holidays']).map(r => ({ id: String(r.id || cryptoId()), date: normalizeExcelDate(r.date), name: String(r.name || '') }));
+      }
+      if (wb.Sheets['Leaves']) {
+        result.leaves = XLSX.utils.sheet_to_json(wb.Sheets['Leaves']).map(r => ({
+          id: String(r.id || cryptoId()), date: normalizeExcelDate(r.date), type: String(r.type || 'casual'), days: Number(r.days) || 1, notes: r.notes ? String(r.notes) : '',
+        }));
+      }
+      if (wb.Sheets['WFH']) {
+        result.wfhLogs = XLSX.utils.sheet_to_json(wb.Sheets['WFH']).map(r => ({
+          id: String(r.id || cryptoId()), date: normalizeExcelDate(r.date), notes: r.notes ? String(r.notes) : '',
+        }));
       }
       resolve(result);
     };

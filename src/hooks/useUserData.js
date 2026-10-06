@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { defaultLeaveSettings } from '../lib/leave';
 
-const EMPTY = { shifts: [], commutes: [], holidays: [] };
+const EMPTY = { shifts: [], commutes: [], holidays: [], leaves: [], wfhLogs: [], leaveSettings: defaultLeaveSettings() };
 
 // Loads/persists a signed-in user's tracker data as a single Firestore document (users/{uid}).
 export function useUserData(uid) {
@@ -22,12 +23,20 @@ export function useUserData(uid) {
     getDoc(doc(db, 'users', uid)).then(snap => {
       if (cancelled) return;
       const d = snap.exists() ? snap.data() : {};
-      setData({ shifts: d.shifts || [], commutes: d.commutes || [], holidays: d.holidays || [] });
+      setData({
+        shifts: d.shifts || [],
+        commutes: d.commutes || [],
+        holidays: d.holidays || [],
+        leaves: d.leaves || [],
+        wfhLogs: d.wfhLogs || [],
+        leaveSettings: { ...defaultLeaveSettings(), ...(d.leaveSettings || {}) },
+      });
       loadedUid.current = uid;
       setLoading(false);
     });
     return () => { cancelled = true; };
   }, [uid]);
+
 
   useEffect(() => {
     // Skip writing back the data we just loaded, or before a user is known.
