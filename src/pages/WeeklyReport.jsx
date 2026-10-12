@@ -4,9 +4,9 @@ import CategoryDot from '../components/CategoryDot';
 import { addDays, parseDateStr, startOfWeek, endOfWeek, toDateStr, weekLabel } from '../lib/dates';
 import {
   computeNetMinutes, minutesToHoursLabel, shiftsInRange, sumNetHours, completedShiftsCount,
-  holidaySet, rangeWorkdayInfo, targetLabel, weeklyStatus,
+  holidaySet, wfhDateSet, rangeWorkdayInfo, targetLabel, weeklyStatus,
 } from '../lib/shift';
-import { commutesInRange, sumFare, categoryText, groupCommutesByDate, modeText } from '../lib/commute';
+import { commutesInRange, sumFare, categoryText, modeText, isOtherExpense } from '../lib/commute';
 import { LEAVE_TYPES } from '../lib/leave';
 import { downloadCsv, SHIFT_CSV_COLUMNS, COMMUTE_CSV_COLUMNS, LEAVE_CSV_COLUMNS, WFH_CSV_COLUMNS } from '../lib/csv';
 import { useToast } from '../context/ToastContext';
@@ -22,17 +22,25 @@ export default function WeeklyReport() {
     const weekShifts = shiftsInRange(shifts, s, e);
     const totalHours = sumNetHours(weekShifts);
     const daysWithData = completedShiftsCount(weekShifts);
-    const wkInfo = rangeWorkdayInfo(s, e, holidaySet(holidays));
+    const wkInfo = rangeWorkdayInfo(s, e, holidaySet(holidays), wfhDateSet(wfhLogs));
     const status = weeklyStatus(totalHours, wkInfo.workdays);
 
     const weekCommutes = commutesInRange(commutes, s, e);
-    const byCategory = {};
-    weekCommutes.forEach(c => {
-      const key = categoryText(c);
-      byCategory[key] = byCategory[key] || { count: 0, total: 0 };
-      byCategory[key].count++;
-      byCategory[key].total += Number(c.fare) || 0;
-    });
+    const weekTrips = weekCommutes.filter(c => !isOtherExpense(c)).sort((a, b) => a.date.localeCompare(b.date) || (a.period || '').localeCompare(b.period || ''));
+    const weekExpenses = weekCommutes.filter(isOtherExpense).sort((a, b) => a.date.localeCompare(b.date));
+
+    const byCategory = cat => list => {
+      const out = {};
+      list.forEach(c => {
+        const key = cat(c);
+        out[key] = out[key] || { count: 0, total: 0 };
+        out[key].count++;
+        out[key].total += Number(c.fare) || 0;
+      });
+      return out;
+    };
+    const tripsByCategory = byCategory(modeText)(weekTrips);
+    const expensesByCategory = byCategory(categoryText)(weekExpenses);
 
     const sStr = toDateStr(s), eStr = toDateStr(e);
     const weekLeaves = leaves.filter(l => l.date >= sStr && l.date <= eStr).sort((a, b) => a.date.localeCompare(b.date));
@@ -41,8 +49,8 @@ export default function WeeklyReport() {
 
     return {
       weekShifts, totalHours, daysWithData, wkInfo, status,
-      weekCommutes, byCategory,
-      commuteGroups: groupCommutesByDate(weekCommutes).sort((a, b) => a.date.localeCompare(b.date)),
+      weekCommutes, weekTrips, weekExpenses, tripsByCategory, expensesByCategory,
+      tripTotal: sumFare(weekTrips), expenseTotal: sumFare(weekExpenses),
       weekLeaves, weekWfh, leaveDaysTotal,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -70,7 +78,7 @@ export default function WeeklyReport() {
             <span>Total Hours: <strong className="stat-accent-blue">{data.totalHours.toFixed(1)}</strong></span>
             <span>Avg / Day: <strong className="stat-accent-blue">{(data.daysWithData ? data.totalHours / data.daysWithData : 0).toFixed(1)}</strong></span>
             <span className={`badge ${data.daysWithData ? data.status.cls : 'badge-neutral'}`}>{data.daysWithData ? data.status.label : 'No data'}</span>
-            <span className="muted">{targetLabel(data.wkInfo.workdays, data.wkInfo.holidayHits)}</span>
+            <span className="muted">{targetLabel(data.wkInfo.workdays, data.wkInfo.holidayHits, data.wkInfo.wfhHits)}</span>
           </div>
           <div className="table-wrap">
             <table>
@@ -88,33 +96,58 @@ export default function WeeklyReport() {
         </div>
 
         <div className="card report-card report-card--commute">
-          <h3>Commute Summary</h3>
+          <h3>Trip Summary</h3>
           <div className="summary-line">
-            <span>Total Spend: <strong className="stat-accent-green">₹{sumFare(data.weekCommutes)}</strong></span>
+            <span>Total Trip Spend: <strong className="stat-accent-green">₹{data.tripTotal}</strong></span>
           </div>
           <div className="table-wrap">
             <table>
-              <thead><tr><th>Category</th><th>Count</th><th>Total ₹</th></tr></thead>
+              <thead><tr><th>Mode</th><th>Trips</th><th>Total ₹</th></tr></thead>
               <tbody>
-                {Object.keys(data.byCategory).length ? Object.entries(data.byCategory).map(([label, v]) => (
+                {Object.keys(data.tripsByCategory).length ? Object.entries(data.tripsByCategory).map(([label, v]) => (
                   <tr key={label}><td><CategoryDot label={label} /></td><td>{v.count}</td><td>₹{v.total}</td></tr>
-                )) : <tr><td colSpan={3} className="muted">No entries this week</td></tr>}
+                )) : <tr><td colSpan={3} className="muted">No trips this week</td></tr>}
               </tbody>
             </table>
           </div>
           <div className="table-wrap">
             <table>
-              <thead><tr><th>Date</th><th>Morning</th><th>Evening</th><th>Other</th><th>Total ₹</th></tr></thead>
+              <thead><tr><th>Date</th><th>Period</th><th>Mode</th><th>Route</th><th>₹</th></tr></thead>
               <tbody>
-                {data.commuteGroups.length ? data.commuteGroups.map(g => (
-                  <tr key={g.date}>
-                    <td>{g.date}</td>
-                    <td>{g.morning ? `${modeText(g.morning)} · ₹${g.morning.fare}` : '–'}</td>
-                    <td>{g.evening ? `${modeText(g.evening)} · ₹${g.evening.fare}` : '–'}</td>
-                    <td>{g.other.length ? g.other.map(o => `${o.notes || 'Other'} · ₹${o.fare}`).join(', ') : '–'}</td>
-                    <td>₹{g.total}</td>
+                {data.weekTrips.length ? data.weekTrips.map(t => (
+                  <tr key={t.id}>
+                    <td>{t.date}</td><td>{t.period}</td><td>{modeText(t)}</td><td>{t.route}</td><td>₹{t.fare}</td>
                   </tr>
-                )) : <tr><td colSpan={5} className="muted">No entries this week</td></tr>}
+                )) : <tr><td colSpan={5} className="muted">No trips this week</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="card report-card report-card--expense">
+          <h3>Other Expenses Summary</h3>
+          <div className="summary-line">
+            <span>Total Other Expenses: <strong className="stat-accent-orange">₹{data.expenseTotal}</strong></span>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Category</th><th>Count</th><th>Total ₹</th></tr></thead>
+              <tbody>
+                {Object.keys(data.expensesByCategory).length ? Object.entries(data.expensesByCategory).map(([label, v]) => (
+                  <tr key={label}><td><CategoryDot label={label} /></td><td>{v.count}</td><td>₹{v.total}</td></tr>
+                )) : <tr><td colSpan={3} className="muted">No other expenses this week</td></tr>}
+              </tbody>
+            </table>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Date</th><th>Category</th><th>Notes</th><th>₹</th></tr></thead>
+              <tbody>
+                {data.weekExpenses.length ? data.weekExpenses.map(x => (
+                  <tr key={x.id}>
+                    <td>{x.date}</td><td>{categoryText(x)}</td><td>{x.notes}</td><td>₹{x.fare}</td>
+                  </tr>
+                )) : <tr><td colSpan={4} className="muted">No other expenses this week</td></tr>}
               </tbody>
             </table>
           </div>

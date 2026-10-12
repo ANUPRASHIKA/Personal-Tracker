@@ -95,7 +95,7 @@ export default function Settings() {
 
   return (
     <section>
-      <div className="card">
+      <div className="card card--orange">
         <h3>Company Holidays</h3>
         <p className="muted">Mark non-working days here. Weekly &amp; monthly hour targets (36–40h over a 5-day week) automatically shrink to exclude them.</p>
         <form className="form-grid" onSubmit={addHolidayEntry}>

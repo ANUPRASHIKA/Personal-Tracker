@@ -34,6 +34,9 @@ export function weekLabel(start, end) {
 export function monthLabel(d) { return `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`; }
 export function monthKeyOf(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`; }
 
+// Most-recent-first ordering, used before writing CSV/Excel exports.
+export function sortByDateDesc(list) { return [...list].sort((a, b) => b.date.localeCompare(a.date)); }
+
 export function timeToMinutes(t) {
   if (!t) return null;
   const [h, m] = t.split(':').map(Number);

@@ -1,6 +1,7 @@
 import { computeNetMinutes } from './shift';
 import { isOtherExpense, routeText, modeText, paymentText, categoryText } from './commute';
 import { LEAVE_TYPES } from './leave';
+import { sortByDateDesc } from './dates';
 
 export const SHIFT_CSV_COLUMNS = [
   { key: 'date', label: 'Date' },
@@ -48,8 +49,9 @@ export function buildCsv(rows, columns) {
 
 export function downloadCsv(rows, columns, filename) {
   if (!rows.length) return false;
-  const csv = buildCsv(rows, columns);
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const csv = buildCsv(sortByDateDesc(rows), columns);
+  // Prepend a UTF-8 BOM so Excel recognizes the encoding instead of mojibake-ing non-ASCII characters (e.g. →).
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = filename;

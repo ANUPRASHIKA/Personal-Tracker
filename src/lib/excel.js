@@ -1,5 +1,5 @@
 import * as XLSX from '@e965/xlsx';
-import { pad2, todayStr } from './dates';
+import { pad2, todayStr, sortByDateDesc } from './dates';
 
 // Excel may store dates/times as its own serial numbers if a cell gets reformatted; normalize back to our string formats.
 function normalizeExcelDate(val) {
@@ -12,18 +12,40 @@ function normalizeExcelTime(val) {
   return String(val);
 }
 
+// Sets each column's width to fit its longest value (header or cell) in that column, capped so one
+// long free-text value (e.g. notes/remarks) doesn't dominate and make the sheet look uneven.
+const MAX_COL_WIDTH = 40;
+function autoSizeColumns(ws, rows) {
+  if (!rows.length) return;
+  const keys = Object.keys(rows[0]);
+  ws['!cols'] = keys.map(key => {
+    const headerLen = String(key).length;
+    const maxValLen = rows.reduce((max, r) => Math.max(max, String(r[key] ?? '').length), 0);
+    return { wch: Math.min(MAX_COL_WIDTH, Math.max(headerLen, maxValLen)) };
+  });
+}
+
 export function exportExcel(shifts, commutes, holidays, leaves = [], wfhLogs = []) {
   const wb = XLSX.utils.book_new();
-  const shiftRows = shifts.map(s => ({ id: s.id, date: s.date, punchIn: s.punchIn || '', punchOut: s.punchOut || '', breakMin: s.breakMin, callMin: s.callMin, notes: s.notes || '' }));
-  const commuteRows = commutes.map(c => ({ id: c.id, date: c.date, type: c.type || 'commute', period: c.period || '', route: c.route || '', routeRemark: c.routeRemark || '', mode: c.mode || '', modeRemark: c.modeRemark || '', payment: c.payment, paymentRemark: c.paymentRemark || '', fare: c.fare, notes: c.notes || '' }));
-  const holidayRows = holidays.map(h => ({ id: h.id, date: h.date, name: h.name }));
-  const leaveRows = leaves.map(l => ({ id: l.id, date: l.date, type: l.type, days: l.days, notes: l.notes || '' }));
-  const wfhRows = wfhLogs.map(w => ({ id: w.id, date: w.date, notes: w.notes || '' }));
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(shiftRows), 'Shifts');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(commuteRows), 'Commutes');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(holidayRows), 'Holidays');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(leaveRows), 'Leaves');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(wfhRows), 'WFH');
+  // id is intentionally omitted here — importExcel auto-generates one for any row missing it.
+  const shiftRows = sortByDateDesc(shifts).map(s => ({ date: s.date, punchIn: s.punchIn || '', punchOut: s.punchOut || '', breakMin: s.breakMin, callMin: s.callMin, notes: s.notes || '' }));
+  const commuteRows = sortByDateDesc(commutes).map(c => ({ date: c.date, type: c.type || 'commute', period: c.period || '', route: c.route || '', routeRemark: c.routeRemark || '', mode: c.mode || '', modeRemark: c.modeRemark || '', payment: c.payment, paymentRemark: c.paymentRemark || '', fare: c.fare, notes: c.notes || '' }));
+  const holidayRows = sortByDateDesc(holidays).map(h => ({ date: h.date, name: h.name }));
+  const leaveRows = sortByDateDesc(leaves).map(l => ({ date: l.date, type: l.type, days: l.days, notes: l.notes || '' }));
+  const wfhRows = sortByDateDesc(wfhLogs).map(w => ({ date: w.date, notes: w.notes || '' }));
+
+  const sheets = [
+    ['Shifts', shiftRows],
+    ['Commutes', commuteRows],
+    ['Holidays', holidayRows],
+    ['Leaves', leaveRows],
+    ['WFH', wfhRows],
+  ];
+  sheets.forEach(([name, rows]) => {
+    const ws = XLSX.utils.json_to_sheet(rows);
+    autoSizeColumns(ws, rows);
+    XLSX.utils.book_append_sheet(wb, ws, name);
+  });
   XLSX.writeFile(wb, `personal-tracker-${todayStr()}.xlsx`);
 }
 

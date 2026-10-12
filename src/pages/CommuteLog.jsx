@@ -1,13 +1,16 @@
 import { useMemo, useState } from 'react';
 import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
-import { todayStr } from '../lib/dates';
+import { todayStr, addMonthsFn, monthKeyOf, monthLabel } from '../lib/dates';
 import { uid } from '../lib/id';
 import {
-  FARE_DEFAULTS, ROUTE_DEFAULTS, modeText, paymentText, groupCommutesByDate, categoryText, totalsByCategory, isOtherExpense, ALL_CATEGORY_LABELS,
+  FARE_DEFAULTS, ROUTE_DEFAULTS, modeText, paymentText, groupCommutesByDate, categoryText, totalsByCategory, isOtherExpense, ALL_CATEGORY_LABELS, CATEGORY_DOT_COLORS,
 } from '../lib/commute';
 import { useSortFilter } from '../hooks/useSortFilter';
 import SortableTh from '../components/SortableTh';
+import DonutChart from '../components/DonutChart';
+import StatIcon from '../components/StatIcon';
+import { Wallet } from 'lucide-react';
 
 const EMPTY_FORM = {
   date: todayStr(), type: 'commute',
@@ -48,6 +51,7 @@ export default function CommuteLog() {
   const showToast = useToast();
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [monthAnchor, setMonthAnchor] = useState(new Date());
 
   const isOther = form.type !== 'commute';
 
@@ -111,8 +115,10 @@ export default function CommuteLog() {
     showToast('Expense entry saved');
   }
 
-  const groups = useMemo(() => groupCommutesByDate(commutes), [commutes]);
-  const categoryTotals = useMemo(() => totalsByCategory(commutes), [commutes]);
+  const monthKey = monthKeyOf(monthAnchor);
+  const monthCommutes = useMemo(() => commutes.filter(c => c.date.slice(0, 7) === monthKey), [commutes, monthKey]);
+  const groups = useMemo(() => groupCommutesByDate(monthCommutes), [monthCommutes]);
+  const categoryTotals = useMemo(() => totalsByCategory(monthCommutes), [monthCommutes]);
   const categoryTotalSum = useMemo(() => Object.values(categoryTotals).reduce((s, v) => s + v, 0), [categoryTotals]);
 
   function entryText(entry) {
@@ -210,7 +216,28 @@ export default function CommuteLog() {
       </div>
 
       <div className="card">
-        <h3>Expense Totals by Category</h3>
+        <div className="report-controls">
+          <button className="btn btn-secondary" onClick={() => setMonthAnchor(addMonthsFn(monthAnchor, -1))}>‹ Prev</button>
+          <span className="report-label">{monthLabel(monthAnchor)}</span>
+          <button className="btn btn-secondary" onClick={() => setMonthAnchor(addMonthsFn(monthAnchor, 1))}>Next ›</button>
+        </div>
+      </div>
+
+      <div className="stat-grid">
+        <div className="card stat-card">
+          <StatIcon icon={Wallet} color="#22d3ee" />
+          <span className="stat-label">Total Expenses</span>
+          <span className="stat-value">₹{categoryTotalSum}</span>
+          <span className="muted">{monthLabel(monthAnchor)}</span>
+        </div>
+      </div>
+
+      <div className="card card--green">
+        <h3>Expense Totals by Category <span className="muted">({monthLabel(monthAnchor)})</span></h3>
+        <DonutChart
+          segments={ALL_CATEGORY_LABELS.map(label => ({ label, value: categoryTotals[label] || 0, color: CATEGORY_DOT_COLORS[label] || '#9aa4b2' }))}
+          centerLabel={monthLabel(monthAnchor)}
+        />
         <div className="table-wrap">
           <table>
             <thead><tr><th>Category</th><th>Total ₹</th></tr></thead>
@@ -224,8 +251,8 @@ export default function CommuteLog() {
         </div>
       </div>
 
-      <div className="card">
-        <h3>All Expense Entries</h3>
+      <div className="card card--green">
+        <h3>All Expense Entries <span className="muted">({monthLabel(monthAnchor)})</span></h3>
         <input className="table-filter" type="text" placeholder="Filter entries…" value={search} onChange={e => setSearch(e.target.value)} />
         <div className="table-wrap">
           <table>
@@ -251,7 +278,7 @@ export default function CommuteLog() {
                   <td className="wrap-cell"><OtherCell entries={g.other.filter(o => o.type === 'amazon-parents')} onEdit={edit} onDelete={remove} /></td>
                   <td>₹{g.total}</td>
                 </tr>
-              )) : <tr><td colSpan={7} className="muted">No expense entries yet</td></tr>}
+              )) : <tr><td colSpan={7} className="muted">No expense entries this month</td></tr>}
             </tbody>
           </table>
         </div>

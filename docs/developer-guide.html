@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Personal Tracker — Developer Guide</title>
+<style>
+  :root {
+    --bg: #140f1f;
+    --surface: #1d1730;
+    --surface-alt: #271f3f;
+    --border: #3a2f52;
+    --text: #e9e6f2;
+    --text-muted: #a398b8;
+    --accent: #8b5cf6;
+    --accent-2: #22d3ee;
+    --warn: #ffb020;
+    --bad: #ff5c5c;
+    --good: #22d3ee;
+    --purple: #cd8bff;
+    --teal: #30e0c8;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 15.5px;
+    line-height: 1.6;
+    display: flex;
+    min-height: 100vh;
+  }
+  nav.toc {
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    height: 100vh;
+    width: 270px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 1.25rem 1rem;
+    overflow-y: auto;
+  }
+  nav.toc h2 {
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    margin: 1.1rem 0 0.4rem;
+  }
+  nav.toc h2:first-child { margin-top: 0; }
+  nav.toc a {
+    display: block;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.88rem;
+    padding: 0.28rem 0.5rem;
+    border-radius: 6px;
+  }
+  nav.toc a:hover { background: var(--surface-alt); color: var(--text); }
+  main {
+    flex: 1;
+    max-width: 980px;
+    padding: 2.25rem 2.5rem 6rem;
+  }
+  h1 { font-size: 2rem; margin-bottom: 0.3rem; }
+  h1 + p.subtitle { color: var(--text-muted); margin-top: 0; font-size: 1.05rem; }
+  section { margin-top: 3rem; padding-top: 0.5rem; border-top: 1px solid var(--border); }
+  section:first-of-type { border-top: none; }
+  h2 {
+    font-size: 1.45rem;
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin-bottom: 0.9rem;
+  }
+  h2 .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  h3 { font-size: 1.1rem; margin-top: 1.6rem; color: var(--text); }
+  h4 { font-size: 0.95rem; margin-top: 1.2rem; color: var(--purple); text-transform: uppercase; letter-spacing: 0.03em; }
+  p { color: var(--text); }
+  .muted { color: var(--text-muted); }
+  code {
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    padding: 0.1rem 0.35rem;
+    border-radius: 5px;
+    font-family: "Cascadia Code", "Consolas", monospace;
+    font-size: 0.88em;
+  }
+  pre {
+    background: #0d0916;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.15rem;
+    overflow-x: auto;
+    font-family: "Cascadia Code", "Consolas", monospace;
+    font-size: 0.85rem;
+    line-height: 1.55;
+  }
+  pre code { background: none; border: none; padding: 0; }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 0.5rem 0.65rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--text-muted); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.03em; background: var(--surface-alt); }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.2rem;
+    margin: 1rem 0;
+  }
+  .badge {
+    display: inline-block;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    margin-right: 0.3rem;
+  }
+  .b-file { background: rgba(139,92,246,0.18); color: var(--purple); }
+  .b-flow { background: rgba(34,211,238,0.18); color: var(--accent-2); }
+  .b-warn { background: rgba(255,176,32,0.18); color: var(--warn); }
+  .flow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 1.1rem 0;
+  }
+  .flow .step {
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.5rem 0.8rem;
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+  .flow .arrow { color: var(--text-muted); font-size: 1.1rem; }
+  ul, ol { padding-left: 1.3rem; }
+  li { margin-bottom: 0.3rem; }
+  .filetree {
+    font-family: "Cascadia Code", "Consolas", monospace;
+    font-size: 0.85rem;
+    background: #0d0916;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.2rem;
+    white-space: pre;
+    overflow-x: auto;
+    color: var(--text-muted);
+  }
+  .filetree .hl { color: var(--accent-2); }
+  a.inline { color: var(--accent-2); }
+  hr.sep { border: none; border-top: 1px dashed var(--border); margin: 2rem 0; }
+  .top-link { position: fixed; bottom: 1.5rem; right: 2rem; background: var(--accent); color: #fff; border-radius: 999px; padding: 0.5rem 1rem; text-decoration: none; font-size: 0.8rem; box-shadow: 0 4px 14px rgba(0,0,0,0.4); }
+</style>
+</head>
+<body>
+
+<nav class="toc">
+  <strong style="font-size:1.05rem;">📘 Dev Guide</strong>
+  <h2>Orientation</h2>
+  <a href="#overview">Overview &amp; Stack</a>
+  <a href="#structure">Project Structure</a>
+  <a href="#getting-started">Getting Started</a>
+  <a href="#architecture">App Architecture</a>
+  <a href="#interaction">Component Interaction</a>
+  <h2>Core Systems</h2>
+  <a href="#auth">Authentication</a>
+  <a href="#data">Data Layer &amp; Firestore</a>
+  <a href="#theme">Theming</a>
+  <a href="#sortfilter">Sort &amp; Filter System</a>
+  <h2>Features</h2>
+  <a href="#shift">Shift Log</a>
+  <a href="#expense">Expense Log</a>
+  <a href="#leave">Leave &amp; WFH</a>
+  <a href="#dashboard">Dashboard</a>
+  <a href="#reports">Reports</a>
+  <a href="#settings">Settings</a>
+  <h2>Shared Code</h2>
+  <a href="#lib">lib/ Utilities</a>
+  <a href="#components">Reusable Components</a>
+  <a href="#hooks">Hooks</a>
+  <h2>Ops</h2>
+  <a href="#firebase">Firebase Setup</a>
+  <a href="#deploy">Deployment</a>
+  <a href="#conventions">Conventions &amp; Tips</a>
+</nav>
+
+<main>
+  <h1>Personal Tracker — Developer Guide</h1>
+  <p class="subtitle">A walkthrough of every feature and the code flow behind it, written for a developer new to this codebase.</p>
+
+  <section id="overview">
+    <h2><span class="dot" style="background:var(--accent)"></span>Overview &amp; Tech Stack</h2>
+    <p>Personal Tracker is a single-page React app for tracking work shifts, commute/expenses, and leave/WFH days, with a dashboard and reports. Data is stored per-user in Firestore so it syncs across devices after signing in with Google.</p>
+    <table>
+      <tr><th>Layer</th><th>Choice</th></tr>
+      <tr><td>UI framework</td><td>React 19 (function components + hooks only, no class components)</td></tr>
+      <tr><td>Build tool</td><td>Vite</td></tr>
+      <tr><td>Auth + Database</td><td>Firebase Authentication (Google sign-in) + Cloud Firestore</td></tr>
+      <tr><td>Styling</td><td>Plain CSS with custom properties (<code>src/index.css</code>) — no CSS framework</td></tr>
+      <tr><td>Icons</td><td><code>lucide-react</code></td></tr>
+      <tr><td>Font</td><td>Inter (self-hosted via <code>@fontsource-variable/inter</code>)</td></tr>
+      <tr><td>Excel import/export</td><td><code>@e965/xlsx</code></td></tr>
+      <tr><td>Hosting</td><td>GitHub Pages, deployed via GitHub Actions on push to <code>main</code></td></tr>
+    </table>
+    <p class="muted">There is no backend server — the "backend" is Firestore directly, accessed from the browser using the Firebase client SDK and secured with Firestore security rules.</p>
+  </section>
+
+  <section id="structure">
+    <h2><span class="dot" style="background:var(--accent-2)"></span>Project Structure</h2>
+    <div class="filetree">index.html
+package.json
+vite.config.js
+.github/workflows/<span class="hl">deploy.yml</span>        — GitHub Actions: build + deploy to Pages
+src/
+  main.jsx                   — React entry point, loads font + CSS
+  App.jsx                    — Provider nesting, tab routing, sign-in gate
+  index.css                  — All app styling (theme variables, layout, components)
+  context/
+    <span class="hl">AuthContext.jsx</span>           — Firebase auth state + sign-in/out
+    <span class="hl">DataContext.jsx</span>           — All tracker data + CRUD methods
+    <span class="hl">ThemeContext.jsx</span>          — Dark/light theme toggle (localStorage)
+    ToastContext.jsx          — Bottom-of-screen toast notifications
+  hooks/
+    <span class="hl">useUserData.js</span>            — Loads/saves the Firestore doc for the signed-in user
+    useSortFilter.js           — Generic table filter + column sort
+    useLocalStorageState.js    — Legacy localStorage hook (unused, kept for reference)
+  lib/                         — Pure functions, no React. All business logic lives here.
+    firebase.js                 — Firebase app/auth/db initialization
+    dates.js                    — Date formatting/parsing helpers
+    shift.js                    — Net-hours math, weekly/monthly target bands
+    commute.js                  — Expense categorization, grouping, totals
+    leave.js                    — Leave accrual rules, balances, warnings
+    csv.js / excel.js            — Export/import for CSV and Excel
+    id.js                        — Random ID generator for new records
+  components/                  — Presentational / reusable UI pieces
+    Header.jsx                  — Left sidebar navigation (despite the filename)
+    Calculator.jsx               — Quick-calc widget shown in a sidebar popover
+    QuickPunch.jsx, Badge.jsx, CategoryDot.jsx, SortableTh.jsx, StatIcon.jsx
+    BarChart.jsx, LineChart.jsx, ComboChart.jsx, DonutChart.jsx
+  pages/                        — One component per app tab
+    Dashboard.jsx, ShiftLog.jsx, CommuteLog.jsx, LeaveLog.jsx,
+    Reports.jsx, WeeklyReport.jsx, MonthlyReport.jsx, Settings.jsx</div>
+  </section>
+
+  <section id="getting-started">
+    <h2><span class="dot" style="background:var(--purple)"></span>Getting Started</h2>
+    <pre><code>npm install      # install dependencies
+npm run dev      # start Vite dev server (hot reload)
+npm run build    # production build to dist/
+npm run preview  # preview the production build locally
+npm run lint     # oxlint</code></pre>
+    <p>The app requires signing in with Google to use it (data is per-user in Firestore), so <code>npm run dev</code> will show the sign-in screen first even locally.</p>
+  </section>
+
+  <section id="architecture">
+    <h2><span class="dot" style="background:var(--warn)"></span>App Architecture</h2>
+    <p><code>App.jsx</code> nests providers from the outside in. Order matters: <code>AuthProvider</code> must wrap the code that decides whether to show the sign-in screen, and <code>DataProvider</code> (which needs the signed-in user's uid) is only mounted once a user exists.</p>
+    <div class="flow">
+      <div class="step">ThemeProvider</div><div class="arrow">→</div>
+      <div class="step">AuthProvider</div><div class="arrow">→</div>
+      <div class="step">AppShell</div>
+    </div>
+    <p>Inside <code>AppShell</code>:</p>
+    <div class="flow">
+      <div class="step">loading? → spinner</div><div class="arrow">→</div>
+      <div class="step">no user? → SignInScreen</div><div class="arrow">→</div>
+      <div class="step">DataProvider → ToastProvider → Sidebar + active Page</div>
+    </div>
+    <p>Which page renders is controlled by a single <code>activeTab</code> string in <code>AppShell</code>'s local state, looked up in a <code>PAGES</code> map:</p>
+    <pre><code>const PAGES = { dashboard: Dashboard, shift: ShiftLog, commute: CommuteLog, leave: LeaveLog, reports: Reports, settings: Settings };
+const Page = PAGES[activeTab];
+...
+&lt;Page /&gt;</code></pre>
+    <p class="muted">There's no router (no URL changes per tab) — it's a simple state-driven single view swap, which is enough for this app's size.</p>
+  </section>
+
+  <section id="interaction">
+    <h2><span class='dot' style='background:var(--purple)'></span>Component Interaction Map</h2>
+    <p>Two different mechanisms carry data between components in this app — knowing which one applies where is the fastest way to trace a bug:</p>
+    <ul>
+      <li><strong>Props (explicit, parent → child):</strong> used for a handful of top-level wiring points, listed below.</li>
+      <li><strong>Context hooks (implicit, any depth):</strong> <code>useData()</code>, <code>useAuth()</code>, <code>useToast()</code>, <code>useTheme()</code> — any component can call these directly without its parent passing anything down. This is how every page gets at <code>shifts</code>/<code>commutes</code>/etc. without <code>App.jsx</code> knowing or caring what each page needs.</li>
+    </ul>
+
+    <h3>Component tree</h3>
+    <div class="filetree">App
+  ThemeProvider                        (context: theme, toggleTheme)
+    AuthProvider                        (context: user, loading, signIn, signOutUser)
+      AppShell                          — reads useAuth() directly
+        SignInScreen                    — reads useAuth() directly (signIn)
+        DataProvider                    (context: shifts/commutes/.../CRUD — wraps useUserData)
+          ToastProvider                 (context: showToast)
+            Header                      <span class="hl">← props: activeTab, onChangeTab, user, onSignOut</span>
+              Calculator                 — fully self-contained, no props, no context
+            Page (Dashboard/ShiftLog/CommuteLog/LeaveLog/Reports/Settings)
+              QuickPunch                 — reads useData() + useToast() directly (Dashboard only)
+              BarChart / LineChart / ComboChart / DonutChart  <span class="hl">← props: bars / segments</span>
+              SortableTh                 <span class="hl">← props: label, sortKey, activeKey, dir, onSort</span>
+              StatIcon / Badge / CategoryDot                  <span class="hl">← props only</span></div>
+
+    <h3>Why <code>Header</code> gets <code>user</code>/<code>onSignOut</code> as props instead of calling <code>useAuth()</code> itself</h3>
+    <p><code>AppShell</code> already has to call <code>useAuth()</code> to decide whether to render the sign-in screen at all, so it passes the same <code>user</code>/<code>signOutUser</code> straight down to <code>Header</code> rather than having <code>Header</code> read the context a second time. <code>activeTab</code>/<code>onChangeTab</code> are plain <code>useState</code> in <code>AppShell</code> (not context) since only <code>Header</code> and the <code>PAGES</code> switch need them.</p>
+
+    <h3>Presentational vs. container components</h3>
+    <table>
+      <tr><th>Category</th><th>Gets data via</th><th>Examples</th></tr>
+      <tr><td>Pages (containers)</td><td><code>useData()</code>, <code>useToast()</code>, own local state</td><td>Dashboard.jsx, ShiftLog.jsx, CommuteLog.jsx, LeaveLog.jsx, WeeklyReport.jsx, MonthlyReport.jsx, Settings.jsx</td></tr>
+      <tr><td>Context-aware widgets</td><td>Call a context hook themselves, no props needed for data</td><td>QuickPunch.jsx (<code>useData</code>, <code>useToast</code>), Header.jsx (<code>useTheme</code>)</td></tr>
+      <tr><td>Pure presentational</td><td>Props only — reusable anywhere, zero coupling to app state</td><td>BarChart, LineChart, ComboChart, DonutChart, SortableTh, StatIcon, Badge, CategoryDot, Calculator</td></tr>
+    </table>
+    <p class="muted">Rule of thumb when adding a component: if it needs tracker data, reach for <code>useData()</code> directly rather than threading props through several layers — that's the established pattern everywhere except the three props <code>Header</code> receives from <code>AppShell</code>.</p>
+  </section>
+
+  <section id="auth">
+    <h2><span class="dot" style="background:var(--accent)"></span>Authentication <span class="badge b-file">AuthContext.jsx</span> <span class="badge b-file">lib/firebase.js</span></h2>
+    <p><code>lib/firebase.js</code> initializes the Firebase app once and exports <code>auth</code>, <code>googleProvider</code>, and <code>db</code> (Firestore). The config object is a public client identifier, not a secret — it's fine to commit.</p>
+    <p><code>AuthContext.jsx</code> listens to Firebase's auth state:</p>
+    <pre><code>const [user, setUser] = useState(undefined); // undefined = not resolved yet
+useEffect(() =&gt; onAuthStateChanged(auth, setUser), []);
+
+value = {
+  user: user ?? null,
+  loading: user === undefined,
+  signIn: () =&gt; signInWithPopup(auth, googleProvider),
+  signOutUser: () =&gt; signOut(auth),
+};</code></pre>
+    <p><code>App.jsx</code> reads <code>loading</code>/<code>user</code> from <code>useAuth()</code> to decide what to render (spinner → sign-in screen → app). Once signed in, <code>user.uid</code> becomes the Firestore document key for all of that person's data.</p>
+  </section>
+
+  <section id="data">
+    <h2><span class="dot" style="background:var(--accent-2)"></span>Data Layer &amp; Firestore <span class="badge b-file">useUserData.js</span> <span class="badge b-file">DataContext.jsx</span></h2>
+    <h3>Storage model</h3>
+    <p>All of a user's data lives in <strong>one Firestore document</strong>: <code>users/{uid}</code>. There are no subcollections. The document looks like:</p>
+    <pre><code>{
+  shifts: [ { id, date, punchIn, punchOut, breakMin, callMin, notes } ],
+  commutes: [ { id, date, type, period, route, routeRemark, mode, modeRemark, payment, paymentRemark, fare, notes } ],
+  holidays: [ { id, date, name } ],
+  leaves: [ { id, date, type, days, notes } ],
+  wfhLogs: [ { id, date, notes } ],
+  leaveSettings: { tenureEligible, annualOpeningBalance, annualOpeningDate }
+}</code></pre>
+    <p>This is deliberately simple (schemaless Firestore + whole-document read/write) because data volumes are small (one person's personal tracker) — there was no need for subcollections or paginated queries.</p>
+
+    <h3>Load/save cycle — <code>useUserData(uid)</code></h3>
+    <div class="flow">
+      <div class="step">uid changes</div><div class="arrow">→</div>
+      <div class="step">getDoc(users/uid)</div><div class="arrow">→</div>
+      <div class="step">setData(merged with defaults)</div><div class="arrow">→</div>
+      <div class="step">loadedUid.current = uid</div>
+    </div>
+    <p>A second <code>useEffect</code> watches <code>data</code> and calls <code>setDoc(..., { merge: true })</code> on every change — <em>but only after</em> the initial load for that uid has completed (guarded by <code>loadedUid.current === uid</code>). This prevents the just-loaded data from being immediately (and redundantly/incorrectly) written back before the real load finishes.</p>
+
+    <h3>DataContext — the public API pages actually use</h3>
+    <p><code>DataContext.jsx</code> wraps <code>useUserData</code> and exposes a flat object via <code>useData()</code>:</p>
+    <ul>
+      <li>Raw arrays: <code>shifts</code>, <code>commutes</code>, <code>holidays</code>, <code>leaves</code>, <code>wfhLogs</code>, <code>leaveSettings</code></li>
+      <li>CRUD per entity: <code>addShift/updateShift/deleteShift</code>, <code>addCommute/...</code>, <code>addHoliday/...</code>, <code>addLeave/...</code>, <code>addWfh/...</code></li>
+      <li><code>updateLeaveSettings(patch)</code> — merges into the settings object</li>
+      <li><code>dedupeAll()</code> — manual "Remove Duplicate Entries" button in Settings</li>
+      <li><code>replaceAll({...})</code> — used by JSON/Excel import (bulk overwrite)</li>
+      <li><code>clearAll()</code> — wipes all data (Settings → "Clear All Data")</li>
+    </ul>
+    <p>On every load, a <code>useEffect</code> in <code>DataContext</code> also runs de-duplication automatically (<code>dedupeShifts</code>, <code>dedupeCommutes</code>, <code>dedupeLeaves</code>, <code>dedupeWfh</code> from <code>lib/</code>) to clean up any legacy duplicate rows.</p>
+
+    <h3>Typical "add an entry" flow (e.g. Shift Log)</h3>
+    <div class="flow">
+      <div class="step">User submits form in ShiftLog.jsx</div><div class="arrow">→</div>
+      <div class="step">addShift(entry)</div><div class="arrow">→</div>
+      <div class="step">DataContext: setShifts(prev =&gt; [...prev, entry])</div><div class="arrow">→</div>
+      <div class="step">useUserData's data state changes</div><div class="arrow">→</div>
+      <div class="step">setDoc() writes the whole doc to Firestore</div>
+    </div>
+    <p class="muted">There is no per-field Firestore write — any single change rewrites the entire document (merged). This is simple and fine at this data scale.</p>
+  </section>
+
+  <section id="theme">
+    <h2><span class="dot" style="background:var(--purple)"></span>Theming <span class="badge b-file">ThemeContext.jsx</span></h2>
+    <p>Dark/light mode is a device-local UI preference — stored in <code>localStorage</code> (key <code>pt_theme</code>), <strong>not</strong> synced via Firestore (it's not "tracker data"). Initial value falls back to the OS/browser's <code>prefers-color-scheme</code>.</p>
+    <pre><code>useEffect(() =&gt; {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('pt_theme', theme);
+}, [theme]);</code></pre>
+    <p>All colors in <code>index.css</code> are CSS custom properties on <code>:root</code>, re-declared under <code>:root[data-theme='light']</code>. Flipping the <code>data-theme</code> attribute is the entire mechanism — no component re-render is needed for the color swap itself, only the toggle button's icon (Sun/Moon) reacts to <code>theme</code> state.</p>
+    <h3>Per-section accent colors</h3>
+    <p>Many cards/tables use a <code>--card-accent</code> variable (defaults to <code>--accent</code>) to tint their header/zebra-stripes/hover differently per feature area:</p>
+    <pre><code>.card--green  { --card-accent: var(--accent-2); }   /* Expense Log */
+.card--purple { --card-accent: var(--accent-purple); } /* Leave */
+.card--teal   { --card-accent: var(--accent-teal); }   /* WFH */
+.card--orange { --card-accent: var(--warn); }          /* Holidays */
+
+th { background: color-mix(in srgb, var(--card-accent, var(--accent)) 14%, transparent); }</code></pre>
+    <p class="muted">Requires a browser that supports CSS <code>color-mix()</code> (Chrome 111+/Firefox 113+/Safari 16.4+).</p>
+  </section>
+
+  <section id="sortfilter">
+    <h2><span class="dot" style="background:var(--accent-2)"></span>Sort &amp; Filter System <span class="badge b-file">useSortFilter.js</span> <span class="badge b-file">SortableTh.jsx</span></h2>
+    <p>Every data table in the app (Shift Log, Expense Log, Leave/WFH, Holidays) uses the same two pieces:</p>
+    <h4>useSortFilter(rows, getSearchText, sorters, initialSort)</h4>
+    <ul>
+      <li><code>getSearchText(row)</code> — builds one lowercase string per row; the free-text box filters rows whose haystack includes the search term.</li>
+      <li><code>sorters</code> — <code>{ columnKey: row =&gt; comparableValue }</code>; clicking a column header toggles ascending/descending sort by that accessor.</li>
+      <li>Returns <code>{ search, setSearch, sortKey, sortDir, toggleSort, rows }</code> — <code>rows</code> is the filtered + sorted output to render.</li>
+    </ul>
+    <h4>SortableTh</h4>
+    <p>A <code>&lt;th&gt;</code> that calls <code>onSort(sortKey)</code> on click and shows ▲/▼ when it's the active column. Usage pattern repeated across pages:</p>
+    <pre><code>const { search, setSearch, sortKey, sortDir, toggleSort, rows: sorted } =
+  useSortFilter(shifts, searchTextFn, sorters, { key: 'date', dir: 'desc' });
+
+&lt;input className="table-filter" value={search} onChange={e =&gt; setSearch(e.target.value)} /&gt;
+&lt;SortableTh label="Date" sortKey="date" activeKey={sortKey} dir={sortDir} onSort={toggleTab} /&gt;</code></pre>
+  </section>
+
+  <hr class="sep" />
+
+  <section id="shift">
+    <h2><span class="dot" style="background:var(--purple)"></span>Feature: Shift Log <span class="badge b-flow">Tab: Shift Log</span></h2>
+    <p>Tracks daily punch-in/out and computes net worked hours.</p>
+    <h3>Data shape</h3>
+    <pre><code>{ id, date, punchIn: "HH:MM", punchOut: "HH:MM"|null, breakMin, callMin, notes }</code></pre>
+    <h3>Core math — <code>lib/shift.js</code></h3>
+    <ul>
+      <li><code>computeNetMinutes(shift)</code> = (punchOut − punchIn) − breakMin + callMin (after-hours call time is added back, since it's extra work). Returns <code>null</code> if punch-out hasn't happened yet.</li>
+      <li><code>workdayBand(workdays)</code> = <code>{ low: workdays × 7.2h, high: workdays × 8h }</code> — the expected hour range for a week/period.</li>
+      <li><code>rangeWorkdayInfo(start, end, holidaySet, wfhSet)</code> counts Mon–Fri days in a range, splitting them into real workdays vs. holidays vs. WFH days (both of the latter are excluded from the hour target — see box below).</li>
+      <li><code>weeklyStatus(totalHours, workdays)</code> → badge class + label: Under / On Track / Over, compared against <code>workdayBand</code>.</li>
+    </ul>
+    <div class="card">
+      <strong>Why WFH reduces the target:</strong> On a day logged as WFH, the user doesn't log a Shift Log entry (punch in/out), so that day shouldn't count toward the 36–40h/week office-attendance target — exactly like a holiday. This is why <code>rangeWorkdayInfo</code> takes both a holiday set and a WFH date set.
+    </div>
+    <h3>Code flow — adding/editing an entry (<code>ShiftLog.jsx</code>)</h3>
+    <div class="flow">
+      <div class="step">Form state (controlled inputs)</div><div class="arrow">→</div>
+      <div class="step">submit() builds entry object</div><div class="arrow">→</div>
+      <div class="step">duplicate-date check</div><div class="arrow">→</div>
+      <div class="step">addShift() or updateShift()</div><div class="arrow">→</div>
+      <div class="step">useSortFilter renders the table</div>
+    </div>
+    <h3>QuickPunch.jsx</h3>
+    <p>A small dashboard widget with two buttons: <strong>Punch In Now</strong> creates today's shift with the current time; <strong>Punch Out Now</strong> fills in <code>punchOut</code> on the existing entry. It reads/writes through the same <code>DataContext</code> methods as the full Shift Log form.</p>
+  </section>
+
+  <section id="expense">
+    <h2><span class="dot" style="background:var(--accent-2)"></span>Feature: Expense Log <span class="badge b-flow">Tab: Expense Log</span> <span class="badge b-file">CommuteLog.jsx</span></h2>
+    <p>Despite the file being named <code>CommuteLog.jsx</code>, this page now covers both daily commute trips <em>and</em> flat one-off expenses (Other Expense, My Amazon Expenses, Parents Expense).</p>
+    <h3>Data shape</h3>
+    <pre><code>{
+  id, date, type: 'commute' | 'other' | 'amazon-mine' | 'amazon-parents',
+  period: 'morning'|'evening'|null,   // only for type:'commute'
+  route, routeRemark, mode, modeRemark,   // only for type:'commute'
+  payment, paymentRemark, fare, notes
+}</code></pre>
+    <h3>Key concept — <code>isOtherExpense(c)</code></h3>
+    <p>In <code>lib/commute.js</code>, <code>isOtherExpense(c) = c.type !== 'commute'</code>. Anything that isn't a commute trip (Other/Amazon-mine/Amazon-parents) is a "flat expense" — not tied to a morning/evening period, and multiple can exist on the same date.</p>
+    <ul>
+      <li><code>categoryText(c)</code> → category label used everywhere (Auto/Metro for commutes, or the specific flat-expense label).</li>
+      <li><code>groupCommutesByDate(list)</code> → one row per date: <code>{ date, morning, evening, other: [...] }</code>, used by the "All Expense Entries" table (split further into 3 columns: Other Expense / My Amazon / Parents Expense by filtering <code>other</code> by <code>type</code>).</li>
+      <li><code>totalsByCategory(list)</code> → <code>{ [categoryLabel]: totalFare }</code>, feeds both the category table and the <code>DonutChart</code>.</li>
+      <li><code>ALL_CATEGORY_LABELS</code> → fixed list of every possible category, so the breakdown table/chart always shows all categories (even ₹0 ones) instead of only ones with data.</li>
+    </ul>
+    <h3>Month navigation</h3>
+    <p>The page keeps a <code>monthAnchor</code> date in local state; Prev/Next buttons call <code>addMonthsFn(monthAnchor, ±1)</code>. All displayed data (<code>monthCommutes</code>, category totals, entries table) is filtered to <code>c.date.slice(0,7) === monthKeyOf(monthAnchor)</code> — so only one month's expenses are visible at a time, with a "Total Expenses" stat card for that month.</p>
+  </section>
+
+  <section id="leave">
+    <h2><span class="dot" style="background:var(--teal)"></span>Feature: Leave &amp; WFH <span class="badge b-flow">Tab: Leave &amp; WFH</span> <span class="badge b-file">LeaveLog.jsx</span> <span class="badge b-file">lib/leave.js</span></h2>
+    <p>This is the most math-heavy feature — it models a real org leave policy and derives live balances purely from logged entries (there's no separate "balance" field persisted anywhere).</p>
+    <h3>Policy constants (<code>lib/leave.js</code>)</h3>
+    <table>
+      <tr><th>Type</th><th>Accrual</th><th>Carry-forward</th></tr>
+      <tr><td>Sick</td><td>+1/month (credited on the 1st)</td><td>No — resets every calendar year</td></tr>
+      <tr><td>Casual</td><td>+1/month</td><td>No</td></tr>
+      <tr><td>Annual</td><td>+1.75/month (credited at month-end)</td><td><strong>Yes</strong>, capped at 45 total</td></tr>
+      <tr><td>Tenure</td><td>+1/year if <code>tenureEligible</code></td><td>No</td></tr>
+      <tr><td>Wellness</td><td>+1/month</td><td>No — lapses at month end, can't bank it</td></tr>
+      <tr><td>WFH</td><td>n/a — 26 days/year cap</td><td>n/a</td></tr>
+    </table>
+    <h3>How balances are computed — <code>computeLeaveBalances(leaves, settings, asOf)</code></h3>
+    <ul>
+      <li><strong>Sick/Casual/Tenure:</strong> accrued-so-far-this-year minus entries logged this year of that type. Simple, resets naturally every Jan 1 because the accrual formula is anchored to the current year.</li>
+      <li><strong>Annual (carry-forward):</strong> anchored to a user-set <code>annualOpeningBalance</code> + <code>annualOpeningDate</code> (set once in Settings → Leave Policy, e.g. "42 as of 2025-12-31"). The function counts month-end accrual events strictly after that anchor date, subtracts annual leave logged after the anchor, and caps the result at 45 (<code>ANNUAL_CARRY_FORWARD_CAP</code>). Both the capped value (<code>annual</code>) and the true uncapped total (<code>annualActual</code>) are returned — the UI shows the actual number and only mentions the cap note once it's exceeded.</li>
+      <li><strong>Wellness:</strong> <code>1 − (wellness entries logged this month)</code>, clamped to 0 — deliberately ignores all other months.</li>
+    </ul>
+    <h3>Warnings — <code>monthlyWarnings(leaves, wfhLogs)</code></h3>
+    <p>Returns an array of warning strings for the current month: WFH days &gt; 2/month, or total leave days &gt; 5/month. These render as orange banners at the top of both the Leave &amp; WFH page <em>and</em> the Dashboard (reusing the same function, so the thresholds only live in one place).</p>
+    <h3>Code flow — logging a leave entry</h3>
+    <div class="flow">
+      <div class="step">Add Leave Entry form</div><div class="arrow">→</div>
+      <div class="step">duplicate (date+type) check</div><div class="arrow">→</div>
+      <div class="step">addLeave(entry)</div><div class="arrow">→</div>
+      <div class="step">computeLeaveBalances() re-runs (useMemo)</div><div class="arrow">→</div>
+      <div class="step">balance cards + warnings + charts update</div>
+    </div>
+    <h3>Other helpers</h3>
+    <ul>
+      <li><code>wfhUsage(wfhLogs)</code> → <code>{ usedThisYear, usedThisMonth, remaining }</code> against the 26/year cap.</li>
+      <li><code>leaveUsageByType(leaves)</code> → days availed per type this year, feeds the "Leave Days Availed by Category" table.</li>
+      <li><code>lastMonths(6)</code> → used to build the 6-month trend <code>ComboChart</code>s (Leave Trend, WFH Trend).</li>
+    </ul>
+    <p class="muted">Both the Leave entries table and the WFH entries table include a <strong>Day</strong> column (Mon–Sun) right after Date, computed via a small <code>dayOfWeek(date)</code> helper in <code>LeaveLog.jsx</code> (<code>DOW_SHORT[(parseDateStr(date).getDay() + 6) % 7]</code>) — the same pattern Settings uses for the Holidays table. It's wired into both <code>useSortFilter</code> calls so it's sortable and included in the free-text filter.</p>
+  </section>
+
+  <section id="dashboard">
+    <h2><span class="dot" style="background:var(--accent)"></span>Dashboard <span class="badge b-file">Dashboard.jsx</span></h2>
+    <p>A read-only aggregation view — it doesn't own any data, it just imports <code>useData()</code> and derives everything via <code>useMemo</code>:</p>
+    <ul>
+      <li><strong>stats</strong> — today's net hours, this week's hours + target status, this month's avg/week, week/month commute spend, month leave days, month WFH count. Also builds <code>bannerText</code> (over/under target warning, noting excluded holidays/WFH days) and reuses <code>monthlyWarnings</code> from leave.js.</li>
+      <li><strong>hoursBars / expenseBars</strong> — last 6 weeks of data, rendered via <code>ComboChart</code> (bars + dashed average line).</li>
+      <li><strong>breakdown</strong> — this month's expenses grouped by category, rendered via <code>DonutChart</code>.</li>
+      <li><strong>recentShifts / recentCommuteGroups / recentLeaves / recentWfh</strong> — last 5 of each, shown in small tables at the bottom.</li>
+    </ul>
+    <p>Each stat card has a colored <code>StatIcon</code> badge (icon + hex color passed as props) — these are independent of the CSS theme variables, so they stay vivid in both light and dark mode.</p>
+  </section>
+
+  <section id="reports">
+    <h2><span class="dot" style="background:var(--warn)"></span>Reports <span class="badge b-file">Reports.jsx</span> <span class="badge b-file">WeeklyReport.jsx</span> <span class="badge b-file">MonthlyReport.jsx</span></h2>
+    <p><code>Reports.jsx</code> is just a sub-tab switcher (Weekly/Monthly) with its own <code>subtabs</code> nav; the real logic lives in the two child pages.</p>
+    <h3>Important design decision: Trips vs. Other Expenses</h3>
+    <p>Both report pages split commute data into two independent sections instead of one mixed "Commute Summary":</p>
+    <ul>
+      <li><strong>Trip Summary</strong> — only <code>type === 'commute'</code> entries (Auto/Metro rides). Shows total trip spend + a mode breakdown + the trip list.</li>
+      <li><strong>Other Expenses Summary</strong> — everything else (<code>isOtherExpense(c)</code>). Shows total + category breakdown + entry list.</li>
+    </ul>
+    <p class="muted">This exists because a flat "Trips" count used to incorrectly include Amazon/Other expense entries, which aren't trips at all.</p>
+    <h3>Shift summary math</h3>
+    <p>Reuses the exact same <code>rangeWorkdayInfo</code> / <code>weeklyStatus</code> / <code>targetLabel</code> functions from <code>lib/shift.js</code> as the Dashboard, so holidays and WFH days are excluded from the target band here too. <code>MonthlyReport</code> additionally buckets each week into its own row (grouping shifts/commutes/leaves/WFH by <code>startOfWeek(date)</code>).</p>
+    <h3>CSV export</h3>
+    <p>Every report section has an "Export … CSV" button calling <code>downloadCsv(rows, COLUMNS, filename)</code> from <code>lib/csv.js</code> — <code>COLUMNS</code> is a declarative list of <code>{ key, label }</code> (key can be a field name or a function for computed columns, e.g. Net Hours). Rows are automatically sorted most-recent-first before writing.</p>
+  </section>
+
+  <section id="settings">
+    <h2><span class="dot" style="background:var(--bad)"></span>Settings <span class="badge b-file">Settings.jsx</span></h2>
+    <p>Four independent cards:</p>
+    <ol>
+      <li><strong>Company Holidays</strong> — simple add/remove list; holidays feed into the Shift target-band calculations app-wide.</li>
+      <li><strong>Leave Policy</strong> — <code>tenureEligible</code> checkbox + <code>annualOpeningBalance</code>/<code>annualOpeningDate</code> inputs, written via <code>updateLeaveSettings()</code>. This is the "anchor" described in the Leave &amp; WFH section above.</li>
+      <li><strong>Backup &amp; Restore</strong> — <code>exportJson()</code> dumps the whole data shape (shifts/commutes/holidays/leaves/wfhLogs/leaveSettings) to a downloadable <code>.json</code> file; <code>importJson(file)</code> reads it back and calls <code>replaceAll()</code> after a confirm dialog.</li>
+      <li><strong>Excel Sync</strong> — <code>exportExcel()</code>/<code>importExcel()</code> (lib/excel.js) do the same round-trip but as an <code>.xlsx</code> workbook with one sheet per entity (Shifts/Commutes/Holidays/Leaves/WFH) — handy for manually syncing between two devices via OneDrive/Drive. Rows are sorted most-recent-first, columns are auto-sized to fit their longest value (capped at 40 chars so one long note can't dominate the sheet), and the <code>id</code> column is omitted from the export (optional on import — missing IDs just get freshly generated).</li>
+    </ol>
+    <p class="muted">Both backup paths are <em>type-agnostic</em> for the Expense Log's <code>type</code> field — the Excel importer preserves whatever string is in the <code>type</code> column instead of assuming only <code>'commute'</code>/<code>'other'</code>, so new expense categories round-trip correctly.</p>
+  </section>
+
+  <hr class="sep" />
+
+  <section id="lib">
+    <h2><span class="dot" style="background:var(--purple)"></span><code>lib/</code> Utilities Reference</h2>
+    <table>
+      <tr><th>File</th><th>Purpose</th></tr>
+      <tr><td><code>dates.js</code></td><td>Pure date helpers used everywhere: <code>toDateStr</code>/<code>parseDateStr</code> (canonical <code>YYYY-MM-DD</code> string ⟷ Date), <code>startOfWeek</code>/<code>endOfWeek</code> (Monday-based), <code>monthKeyOf</code> (<code>YYYY-MM</code>), <code>sortByDateDesc</code> (most-recent-first, used by CSV/Excel export), label formatters, <code>timeToMinutes</code>/<code>minutesToHoursLabel</code>.</td></tr>
+      <tr><td><code>shift.js</code></td><td>Net-hours math + workday/target-band calculations (see Shift Log section).</td></tr>
+      <tr><td><code>commute.js</code></td><td>Expense categorization, grouping-by-date, category totals, dedupe (see Expense Log section).</td></tr>
+      <tr><td><code>leave.js</code></td><td>Leave accrual policy, balances, warnings, dedupe (see Leave &amp; WFH section).</td></tr>
+      <tr><td><code>csv.js</code></td><td>Declarative column definitions (<code>SHIFT_CSV_COLUMNS</code> etc.) + <code>buildCsv</code>/<code>downloadCsv</code>. Export-only — there is no CSV <em>import</em> in this app. Rows are sorted most-recent-first (<code>sortByDateDesc</code>) before export, and the file is prefixed with a UTF-8 BOM so Excel doesn't mojibake non-ASCII characters (e.g. the "→" in route labels) when opening it directly.</td></tr>
+      <tr><td><code>excel.js</code></td><td><code>exportExcel()</code> builds a multi-sheet workbook, sorted most-recent-first per sheet, with columns auto-sized to their longest value (capped at 40 chars) and the <code>id</code> field omitted; <code>importExcel(file)</code> parses one back, normalizing Excel's own date/time serial numbers if present and auto-generating an <code>id</code> for any row that doesn't have one.</td></tr>
+      <tr><td><code>id.js</code></td><td><code>uid()</code> — <code>Date.now().toString(36) + random suffix</code>. Good enough for client-generated IDs in a single-user document; not cryptographically unique, but collision risk is negligible here.</td></tr>
+      <tr><td><code>firebase.js</code></td><td>Firebase app/auth/db singletons (see Authentication section).</td></tr>
+    </table>
+  </section>
+
+  <section id="components">
+    <h2><span class="dot" style="background:var(--accent-2)"></span>Reusable Components</h2>
+    <table>
+      <tr><th>Component</th><th>What it does</th></tr>
+      <tr><td><code>Header.jsx</code></td><td>The left sidebar nav (icons via <code>lucide-react</code>, one fixed color per tab), brand + theme toggle + quick calculator toggle, and the signed-in user menu with Sign Out. Collapses to a horizontal scrollable bar on screens ≤800px.</td></tr>
+      <tr><td><code>Calculator.jsx</code></td><td>Self-contained 4-function calculator (no <code>eval()</code> — a small reducer-style state machine) with chained operations, sign toggle, percent, and clear. Rendered inside a floating popover (<code>.calc-popover</code>) anchored to the sidebar's calculator button; toggled open/closed via <code>showCalc</code> state in <code>Header.jsx</code>. Shows a small expression line (e.g. "5 +") above the main display so the pending operand/operator stays visible while typing the next number.</td></tr>
+      <tr><td><code>QuickPunch.jsx</code></td><td>Dashboard widget for one-tap punch in/out (see Shift Log section).</td></tr>
+      <tr><td><code>StatIcon.jsx</code></td><td>Renders a colored circular icon badge: <code>&lt;StatIcon icon={Clock} color="#8b5cf6" /&gt;</code>. Background is the color at ~13% opacity (hex + alpha suffix trick).</td></tr>
+      <tr><td><code>Badge.jsx</code></td><td>Thin wrapper for the <code>.badge</code> CSS classes (<code>badge-good</code>/<code>badge-warn</code>/<code>badge-bad</code>/<code>badge-neutral</code>).</td></tr>
+      <tr><td><code>CategoryDot.jsx</code></td><td>Small colored dot + label, color looked up from <code>CATEGORY_DOT_COLORS</code> in <code>lib/commute.js</code>.</td></tr>
+      <tr><td><code>SortableTh.jsx</code></td><td>Clickable <code>&lt;th&gt;</code> for the sort/filter system (see that section).</td></tr>
+      <tr><td><code>BarChart.jsx</code></td><td>Original simple CSS-based vertical bar chart. Still available but no longer used anywhere — superseded by <code>ComboChart</code>.</td></tr>
+      <tr><td><code>LineChart.jsx</code></td><td>SVG smooth line + filled area chart. Built as a drop-in for <code>BarChart</code>'s <code>bars</code> prop shape. Not currently used (superseded by <code>ComboChart</code>) but kept for reuse.</td></tr>
+      <tr><td><code>ComboChart.jsx</code></td><td><strong>Currently used</strong> for all trend charts (Dashboard's Weekly Hours/Commute Spend, Leave &amp; WFH's Leave/WFH trend). SVG bar chart with a dashed horizontal line at the average of the non-zero values.</td></tr>
+      <tr><td><code>DonutChart.jsx</code></td><td>SVG donut chart from <code>segments: [{label, value, color}]</code>, with a center total and a text legend (value + % share). Used for Dashboard's Expense Breakdown and Expense Log's category totals.</td></tr>
+    </table>
+    <h3>Chart prop shape (shared convention)</h3>
+    <pre><code>// BarChart / LineChart / ComboChart all accept:
+bars: [{ label, value, title /* tooltip */, colorClass /* '', 'good', 'warn', 'bad' */ }]
+
+// DonutChart accepts:
+segments: [{ label, value, color /* hex string */ }]</code></pre>
+  </section>
+
+  <section id="hooks">
+    <h2><span class="dot" style="background:var(--teal)"></span>Hooks</h2>
+    <table>
+      <tr><th>Hook</th><th>Purpose</th></tr>
+      <tr><td><code>useUserData(uid)</code></td><td>Firestore load/save for the signed-in user's document (see Data Layer section).</td></tr>
+      <tr><td><code>useSortFilter(rows, getSearchText, sorters, initialSort)</code></td><td>Generic table filter + sort (see that section).</td></tr>
+      <tr><td><code>useLocalStorageState(key, initialValue)</code></td><td><strong>Legacy / unused.</strong> This was the original persistence mechanism before Firebase was introduced. Kept in the codebase for reference but nothing imports it anymore — all persistence now goes through <code>useUserData</code>.</td></tr>
+    </table>
+  </section>
+
+  <hr class="sep" />
+
+  <section id="firebase">
+    <h2><span class="dot" style="background:var(--bad)"></span>Firebase Setup</h2>
+    <p>Configured once in the Firebase Console (not in this repo, since it's account/project-level config):</p>
+    <ul>
+      <li><strong>Authentication → Sign-in method:</strong> Google provider enabled.</li>
+      <li><strong>Authentication → Authorized domains:</strong> must include <code>localhost</code> (usually default) and <code>&lt;username&gt;.github.io</code> (the GitHub Pages domain), otherwise sign-in fails with <code>auth/unauthorized-domain</code> once deployed.</li>
+      <li><strong>Firestore → Rules:</strong> restricts every user to their own document:</li>
+    </ul>
+    <pre><code>rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null &amp;&amp; request.auth.uid == userId;
+    }
+  }
+}</code></pre>
+    <p class="muted">Adding new fields to the stored document (as this app has done repeatedly — leaves, wfhLogs, leaveSettings, new expense types) never requires a Firebase Console change, since Firestore is schemaless and the rule above already covers the whole per-user document.</p>
+  </section>
+
+  <section id="deploy">
+    <h2><span class="dot" style="background:var(--good)"></span>Deployment <span class="badge b-file">.github/workflows/deploy.yml</span></h2>
+    <div class="flow">
+      <div class="step">git push to main</div><div class="arrow">→</div>
+      <div class="step">GitHub Actions: checkout + npm ci + npm run build</div><div class="arrow">→</div>
+      <div class="step">upload-pages-artifact (dist/)</div><div class="arrow">→</div>
+      <div class="step">deploy-pages</div><div class="arrow">→</div>
+      <div class="step">live at username.github.io/repo-name/</div>
+    </div>
+    <p><code>vite.config.js</code> sets <code>base: '/Personal-Tracker-React/'</code> (or whatever the repo name is) so built asset URLs resolve correctly under the GitHub Pages sub-path — this must always match the repo name exactly, including case.</p>
+  </section>
+
+  <section id="conventions">
+    <h2><span class="dot" style="background:var(--warn)"></span>Conventions &amp; Tips for New Contributors</h2>
+    <ul>
+      <li><strong>Business logic lives in <code>lib/</code>, not in components.</strong> Pages call pure functions from <code>lib/</code> and mostly just handle form state + rendering. When fixing a calculation, look in <code>lib/</code> first.</li>
+      <li><strong>Every list page follows the same shape:</strong> an "Add/Edit Entry" form card at the top, then a filterable/sortable table card below, built with <code>useSortFilter</code> + <code>SortableTh</code>.</li>
+      <li><strong>Duplicate-prevention pattern:</strong> before <code>addX(entry)</code>, check <code>list.some(x =&gt; x.date === entry.date &amp;&amp; ... &amp;&amp; x.id !== entry.id)</code> and show a toast instead of saving. Applied consistently to shifts (per date), commutes (per date+period), leaves (per date+type), and WFH (per date).</li>
+      <li><strong>Color system:</strong> don't hardcode colors in CSS — use the <code>--accent</code>/<code>--accent-2</code>/<code>--accent-purple</code>/<code>--accent-teal</code>/<code>--warn</code>/<code>--bad</code> variables so the light/dark theme toggle keeps working. <code>StatIcon</code> and category-dot colors are the one place fixed hex values are intentionally used (so icon badges stay vivid regardless of theme).</li>
+      <li><strong>Adding a new persisted field:</strong> update the <code>EMPTY</code>/default object in <code>useUserData.js</code>, add it to <code>DataContext</code>'s destructure + CRUD methods + <code>replaceAll</code>/<code>clearAll</code>, and (if it should survive backup/restore) wire it into <code>exportJson</code>/<code>importJson</code> in Settings and <code>exportExcel</code>/<code>importExcel</code> in <code>lib/excel.js</code>. No Firebase Console changes are ever needed for this.</li>
+      <li><strong>Adding a new tab:</strong> create the page component, add it to <code>PAGES</code> in <code>App.jsx</code>, and add a matching entry (key/label/icon/color) to <code>TABS</code> in <code>Header.jsx</code>.</li>
+    </ul>
+  </section>
+
+</main>
+
+<a href="#overview" class="top-link">↑ Top</a>
+
+</body>
+</html>

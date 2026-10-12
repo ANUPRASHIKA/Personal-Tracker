@@ -104,7 +104,7 @@ export default function ShiftLog() {
         </form>
       </div>
 
-      <div className="card">
+      <div className="card card--blue">
         <h3>All Shift Entries</h3>
         <input className="table-filter" type="text" placeholder="Filter entries…" value={search} onChange={e => setSearch(e.target.value)} />
         <div className="table-wrap">

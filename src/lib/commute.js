@@ -11,8 +11,8 @@ export const FLAT_EXPENSE_LABELS = { other: 'Other Expense', 'amazon-mine': 'My 
 
 // Deterministic color dot per category label, purely for a bit of visual variety in report tables.
 export const CATEGORY_DOT_COLORS = {
-  Auto: '#4f8cff', Metro: '#c084fc', Other: '#2dd4bf',
-  'Other Expense': '#f59e0b', 'My Amazon Expenses': '#ef4444', 'Parents Expense': '#22c55e',
+  Auto: '#8b5cf6', Metro: '#c084fc', Other: '#2dd4bf',
+  'Other Expense': '#f59e0b', 'My Amazon Expenses': '#ef4444', 'Parents Expense': '#22d3ee',
 };
 
 // Every category label that can appear in a totals-by-category breakdown, in display order.

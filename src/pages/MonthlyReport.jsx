@@ -2,12 +2,13 @@ import { useMemo, useState } from 'react';
 import { useData } from '../context/DataContext';
 import { addMonthsFn, parseDateStr, startOfWeek, endOfWeek, toDateStr, monthKeyOf, monthLabel, weekLabel } from '../lib/dates';
 import {
-  sumNetHours, completedShiftsCount, holidaySet, rangeWorkdayInfo, targetLabel, weeklyStatus,
+  sumNetHours, completedShiftsCount, holidaySet, wfhDateSet, rangeWorkdayInfo, targetLabel, weeklyStatus,
 } from '../lib/shift';
-import { sumFare } from '../lib/commute';
+import { sumFare, isOtherExpense, categoryText } from '../lib/commute';
 import { LEAVE_TYPES } from '../lib/leave';
 import { downloadCsv, SHIFT_CSV_COLUMNS, COMMUTE_CSV_COLUMNS, LEAVE_CSV_COLUMNS, WFH_CSV_COLUMNS } from '../lib/csv';
 import { useToast } from '../context/ToastContext';
+import CategoryDot from '../components/CategoryDot';
 
 export default function MonthlyReport() {
   const { shifts, commutes, holidays, leaves, wfhLogs } = useData();
@@ -28,12 +29,14 @@ export default function MonthlyReport() {
     });
     const weekKeys = [...weekMap.keys()].sort();
     const hset = holidaySet(holidays);
+    const wset = wfhDateSet(wfhLogs);
     const weekInfos = weekKeys.map(wk => {
       const start = parseDateStr(wk), end = endOfWeek(start);
-      return rangeWorkdayInfo(start, end, hset);
+      return rangeWorkdayInfo(start, end, hset, wset);
     });
     const totalWorkdays = weekInfos.reduce((sum, i) => sum + i.workdays, 0);
     const totalHolidayHits = weekInfos.reduce((sum, i) => sum + i.holidayHits, 0);
+    const totalWfhHits = weekInfos.reduce((sum, i) => sum + i.wfhHits, 0);
     const avgWorkdaysPerWeek = weekKeys.length ? totalWorkdays / weekKeys.length : 5;
     const avgPerWeek = weekKeys.length ? totalHours / weekKeys.length : 0;
     const hasData = completedShiftsCount(monthShifts) > 0;
@@ -48,17 +51,30 @@ export default function MonthlyReport() {
     });
 
     const monthCommutes = commutes.filter(c => c.date.slice(0, 7) === key);
-    const cWeekMap = new Map();
-    monthCommutes.forEach(c => {
-      const wk = toDateStr(startOfWeek(parseDateStr(c.date)));
-      if (!cWeekMap.has(wk)) cWeekMap.set(wk, []);
-      cWeekMap.get(wk).push(c);
-    });
-    const cWeekKeys = [...cWeekMap.keys()].sort();
-    const commuteWeekRows = cWeekKeys.map(wk => {
-      const start = parseDateStr(wk), end = endOfWeek(start);
-      const list = cWeekMap.get(wk);
-      return { label: weekLabel(start, end), count: list.length, total: sumFare(list) };
+    const monthTrips = monthCommutes.filter(c => !isOtherExpense(c));
+    const monthExpenses = monthCommutes.filter(isOtherExpense).sort((a, b) => a.date.localeCompare(b.date));
+
+    function weeklyRows(list) {
+      const wMap = new Map();
+      list.forEach(c => {
+        const wk = toDateStr(startOfWeek(parseDateStr(c.date)));
+        if (!wMap.has(wk)) wMap.set(wk, []);
+        wMap.get(wk).push(c);
+      });
+      return [...wMap.keys()].sort().map(wk => {
+        const start = parseDateStr(wk), end = endOfWeek(start);
+        const wList = wMap.get(wk);
+        return { label: weekLabel(start, end), count: wList.length, total: sumFare(wList) };
+      });
+    }
+    const tripWeekRows = weeklyRows(monthTrips);
+    const expenseWeekRows = weeklyRows(monthExpenses);
+    const expensesByCategory = {};
+    monthExpenses.forEach(c => {
+      const cKey = categoryText(c);
+      expensesByCategory[cKey] = expensesByCategory[cKey] || { count: 0, total: 0 };
+      expensesByCategory[cKey].count++;
+      expensesByCategory[cKey].total += Number(c.fare) || 0;
     });
 
     const monthLeaves = leaves.filter(l => l.date.slice(0, 7) === key).sort((a, b) => a.date.localeCompare(b.date));
@@ -89,8 +105,9 @@ export default function MonthlyReport() {
     });
 
     return {
-      monthShifts, totalHours, avgPerWeek, avgWorkdaysPerWeek, hasData, status, totalHolidayHits, weekRows,
-      monthCommutes, commuteWeekRows,
+      monthShifts, totalHours, avgPerWeek, avgWorkdaysPerWeek, hasData, status, totalHolidayHits, totalWfhHits, weekRows,
+      monthCommutes, monthTrips, monthExpenses, tripWeekRows, expenseWeekRows, expensesByCategory,
+      tripTotal: sumFare(monthTrips), expenseTotal: sumFare(monthExpenses),
       monthLeaves, monthWfh, leaveDaysTotal, leaveWeekRows, wfhWeekRows,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -118,7 +135,7 @@ export default function MonthlyReport() {
             <span>Total Hours: <strong className="stat-accent-blue">{data.totalHours.toFixed(1)}</strong></span>
             <span>Avg / Week: <strong className="stat-accent-blue">{data.avgPerWeek.toFixed(1)}</strong></span>
             <span className={`badge ${data.hasData ? data.status.cls : 'badge-neutral'}`}>{data.hasData ? data.status.label : 'No data'}</span>
-            {data.hasData && <span className="muted">{targetLabel(data.avgWorkdaysPerWeek, data.totalHolidayHits)}</span>}
+            {data.hasData && <span className="muted">{targetLabel(data.avgWorkdaysPerWeek, data.totalHolidayHits, data.totalWfhHits)}</span>}
           </div>
           <div className="table-wrap">
             <table>
@@ -136,17 +153,17 @@ export default function MonthlyReport() {
         </div>
 
         <div className="card report-card report-card--commute">
-          <h3>Commute Summary (by week)</h3>
+          <h3>Trip Summary (by week)</h3>
           <div className="summary-line">
-            <span>Total Spend: <strong className="stat-accent-green">₹{sumFare(data.monthCommutes)}</strong></span>
+            <span>Total Trip Spend: <strong className="stat-accent-green">₹{data.tripTotal}</strong></span>
           </div>
           <div className="table-wrap">
             <table>
               <thead><tr><th>Week</th><th>Trips</th><th>Total ₹</th></tr></thead>
               <tbody>
-                {data.commuteWeekRows.length ? data.commuteWeekRows.map(w => (
+                {data.tripWeekRows.length ? data.tripWeekRows.map(w => (
                   <tr key={w.label}><td>{w.label}</td><td>{w.count}</td><td>₹{w.total}</td></tr>
-                )) : <tr><td colSpan={3} className="muted">No entries this month</td></tr>}
+                )) : <tr><td colSpan={3} className="muted">No trips this month</td></tr>}
               </tbody>
             </table>
           </div>
@@ -154,6 +171,33 @@ export default function MonthlyReport() {
       </div>
 
       <div className="grid-2col">
+        <div className="card report-card report-card--expense">
+          <h3>Other Expenses Summary (by week)</h3>
+          <div className="summary-line">
+            <span>Total Other Expenses: <strong className="stat-accent-orange">₹{data.expenseTotal}</strong></span>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Week</th><th>Entries</th><th>Total ₹</th></tr></thead>
+              <tbody>
+                {data.expenseWeekRows.length ? data.expenseWeekRows.map(w => (
+                  <tr key={w.label}><td>{w.label}</td><td>{w.count}</td><td>₹{w.total}</td></tr>
+                )) : <tr><td colSpan={3} className="muted">No other expenses this month</td></tr>}
+              </tbody>
+            </table>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Category</th><th>Count</th><th>Total ₹</th></tr></thead>
+              <tbody>
+                {Object.keys(data.expensesByCategory).length ? Object.entries(data.expensesByCategory).map(([label, v]) => (
+                  <tr key={label}><td><CategoryDot label={label} /></td><td>{v.count}</td><td>₹{v.total}</td></tr>
+                )) : <tr><td colSpan={3} className="muted">No other expenses this month</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <div className="card report-card report-card--leave">
           <h3>Leave Summary (by week)</h3>
           <div className="summary-line">
@@ -182,7 +226,9 @@ export default function MonthlyReport() {
             </table>
           </div>
         </div>
+      </div>
 
+      <div className="grid-2col">
         <div className="card report-card report-card--wfh">
           <h3>WFH Summary (by week)</h3>
           <div className="summary-line">

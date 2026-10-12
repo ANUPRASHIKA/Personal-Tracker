@@ -29,28 +29,36 @@ export function sumNetHours(list) {
 // Only count days that have both punch-in and punch-out when deciding if a status badge should show.
 export function completedShiftsCount(list) { return list.filter(s => computeNetMinutes(s) != null).length; }
 
-// A working day targets 7.2-8h net (36-40h over a 5-day week); holidays reduce the expected workdays.
+// A working day targets 7.2-8h net (36-40h over a 5-day week); holidays and WFH days reduce the expected workdays.
 export function holidaySet(holidays) { return new Set(holidays.map(h => h.date)); }
+export function wfhDateSet(wfhLogs) { return new Set(wfhLogs.map(w => w.date)); }
 export function isWeekday(d) { const dow = d.getDay(); return dow >= 1 && dow <= 5; }
 
-// Counts Mon-Fri days in [start, end] (inclusive), split into working days vs. days marked as holidays.
-export function rangeWorkdayInfo(start, end, hset) {
-  let workdays = 0, holidayHits = 0;
+// Counts Mon-Fri days in [start, end] (inclusive), split into working days vs. days marked as
+// holidays vs. WFH days (no office Shift Log entry is expected on those, so they don't count either).
+export function rangeWorkdayInfo(start, end, hset, wfhSet = new Set()) {
+  let workdays = 0, holidayHits = 0, wfhHits = 0;
   for (let d = new Date(start); d <= end; d = addDays(d, 1)) {
     if (!isWeekday(d)) continue;
-    if (hset.has(toDateStr(d))) holidayHits++; else workdays++;
+    const ds = toDateStr(d);
+    if (hset.has(ds)) { holidayHits++; continue; }
+    if (wfhSet.has(ds)) { wfhHits++; continue; }
+    workdays++;
   }
-  return { workdays, holidayHits };
+  return { workdays, holidayHits, wfhHits };
 }
 
 export function workdayBand(workdays) {
   return { low: workdays * 7.2, high: workdays * 8 };
 }
 
-export function targetLabel(workdays, holidayHits) {
+export function targetLabel(workdays, holidayHits, wfhHits = 0) {
   const { low, high } = workdayBand(workdays);
   const base = `Target ${low.toFixed(1)}–${high.toFixed(1)}h`;
-  return holidayHits > 0 ? `${base} (${holidayHits} holiday${holidayHits > 1 ? 's' : ''} excluded)` : base;
+  const notes = [];
+  if (holidayHits > 0) notes.push(`${holidayHits} holiday${holidayHits > 1 ? 's' : ''} excluded`);
+  if (wfhHits > 0) notes.push(`${wfhHits} WFH day${wfhHits > 1 ? 's' : ''} excluded`);
+  return notes.length ? `${base} (${notes.join(', ')})` : base;
 }
 
 // Status vs. the workday-adjusted target band (default 36-40h for a full 5-day week).

@@ -2,12 +2,14 @@ import { useMemo, useState } from 'react';
 import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
 import { uid } from '../lib/id';
-import { todayStr } from '../lib/dates';
+import { todayStr, parseDateStr, DOW_SHORT } from '../lib/dates';
 import {
   LEAVE_TYPES, computeLeaveBalances, wfhUsage, monthlyWarnings, lastMonths, leaveUsageByType,
   WFH_ANNUAL_CAP, ANNUAL_CARRY_FORWARD_CAP, WFH_MONTHLY_WARN_THRESHOLD, LEAVES_MONTHLY_WARN_THRESHOLD,
 } from '../lib/leave';
-import BarChart from '../components/BarChart';
+import ComboChart from '../components/ComboChart';
+import StatIcon from '../components/StatIcon';
+import { Thermometer, Umbrella, CalendarDays, Award, HeartPulse, Home } from 'lucide-react';
 import { useSortFilter } from '../hooks/useSortFilter';
 import SortableTh from '../components/SortableTh';
 
@@ -87,14 +89,15 @@ export default function LeaveLog() {
   const sortedLeaves = useMemo(() => [...leaves].sort((a, b) => b.date.localeCompare(a.date)), [leaves]);
   const sortedWfh = useMemo(() => [...wfhLogs].sort((a, b) => b.date.localeCompare(a.date)), [wfhLogs]);
 
-  const leaveSearchText = l => `${l.date} ${LEAVE_TYPES[l.type] || l.type} ${l.days} ${l.notes || ''}`;
+  const dayOfWeek = date => DOW_SHORT[(parseDateStr(date).getDay() + 6) % 7];
+  const leaveSearchText = l => `${l.date} ${dayOfWeek(l.date)} ${LEAVE_TYPES[l.type] || l.type} ${l.days} ${l.notes || ''}`;
   const leaveSorters = {
-    date: l => l.date, type: l => LEAVE_TYPES[l.type] || l.type, days: l => Number(l.days) || 0, notes: l => l.notes || '',
+    date: l => l.date, day: l => dayOfWeek(l.date), type: l => LEAVE_TYPES[l.type] || l.type, days: l => Number(l.days) || 0, notes: l => l.notes || '',
   };
   const leaveTable = useSortFilter(sortedLeaves, leaveSearchText, leaveSorters, { key: 'date', dir: 'desc' });
 
-  const wfhSearchText = w => `${w.date} ${w.notes || ''}`;
-  const wfhSorters = { date: w => w.date, notes: w => w.notes || '' };
+  const wfhSearchText = w => `${w.date} ${dayOfWeek(w.date)} ${w.notes || ''}`;
+  const wfhSorters = { date: w => w.date, day: w => dayOfWeek(w.date), notes: w => w.notes || '' };
   const wfhTable = useSortFilter(sortedWfh, wfhSearchText, wfhSorters, { key: 'date', dir: 'desc' });
 
   return (
@@ -103,16 +106,19 @@ export default function LeaveLog() {
 
       <div className="stat-grid">
         <div className="card stat-card">
+          <StatIcon icon={Thermometer} color="#ef4444" />
           <span className="stat-label">Sick Leave</span>
           <span className="stat-value">{balances.sick.toFixed(2)}</span>
           <span className="muted">of 12/yr</span>
         </div>
         <div className="card stat-card">
+          <StatIcon icon={Umbrella} color="#8b5cf6" />
           <span className="stat-label">Casual Leave</span>
           <span className="stat-value">{balances.casual.toFixed(2)}</span>
           <span className="muted">of 12/yr</span>
         </div>
         <div className="card stat-card">
+          <StatIcon icon={CalendarDays} color="#c084fc" />
           <span className="stat-label">Annual Leave</span>
           <span className="stat-value">{balances.annualActual.toFixed(2)}</span>
           <span className="muted">
@@ -122,16 +128,19 @@ export default function LeaveLog() {
           </span>
         </div>
         <div className="card stat-card">
+          <StatIcon icon={Award} color="#f59e0b" />
           <span className="stat-label">Tenure Leave</span>
           <span className="stat-value">{balances.tenure.toFixed(2)}</span>
           <span className="muted">of {leaveSettings.tenureEligible ? 1 : 0}/yr</span>
         </div>
         <div className="card stat-card">
+          <StatIcon icon={HeartPulse} color="#22d3ee" />
           <span className="stat-label">Wellness Leave</span>
           <span className="stat-value">{balances.wellness.toFixed(2)}</span>
           <span className="muted">lapses monthly</span>
         </div>
         <div className="card stat-card">
+          <StatIcon icon={Home} color="#2dd4bf" />
           <span className="stat-label">WFH Remaining</span>
           <span className="stat-value">{wfh.remaining}</span>
           <span className="muted">of {WFH_ANNUAL_CAP}/yr · {wfh.usedThisMonth} this month</span>
@@ -141,11 +150,11 @@ export default function LeaveLog() {
       <div className="grid-2col">
         <div className="card">
           <h3>Leave Trend <span className="muted">(last 6 months)</span></h3>
-          <BarChart bars={leaveTrendBars} />
+          <ComboChart bars={leaveTrendBars} />
         </div>
         <div className="card">
           <h3>WFH Trend <span className="muted">(last 6 months)</span></h3>
-          <BarChart bars={wfhTrendBars} />
+          <ComboChart bars={wfhTrendBars} />
         </div>
       </div>
 
@@ -176,7 +185,7 @@ export default function LeaveLog() {
         </form>
       </div>
 
-      <div className="card">
+      <div className="card card--purple">
         <h3>Leave Days Availed <span className="muted">(this year, by category)</span></h3>
         <div className="table-wrap">
           <table>
@@ -191,7 +200,7 @@ export default function LeaveLog() {
         </div>
       </div>
 
-      <div className="card">
+      <div className="card card--purple">
         <h3>All Leave Entries</h3>
         <input className="table-filter" type="text" placeholder="Filter entries…" value={leaveTable.search} onChange={e => leaveTable.setSearch(e.target.value)} />
         <div className="table-wrap">
@@ -199,6 +208,7 @@ export default function LeaveLog() {
             <thead>
               <tr>
                 <SortableTh label="Date" sortKey="date" activeKey={leaveTable.sortKey} dir={leaveTable.sortDir} onSort={leaveTable.toggleSort} />
+                <SortableTh label="Day" sortKey="day" activeKey={leaveTable.sortKey} dir={leaveTable.sortDir} onSort={leaveTable.toggleSort} />
                 <SortableTh label="Type" sortKey="type" activeKey={leaveTable.sortKey} dir={leaveTable.sortDir} onSort={leaveTable.toggleSort} />
                 <SortableTh label="Days" sortKey="days" activeKey={leaveTable.sortKey} dir={leaveTable.sortDir} onSort={leaveTable.toggleSort} />
                 <SortableTh label="Notes" sortKey="notes" activeKey={leaveTable.sortKey} dir={leaveTable.sortDir} onSort={leaveTable.toggleSort} />
@@ -209,6 +219,7 @@ export default function LeaveLog() {
               {leaveTable.rows.length ? leaveTable.rows.map(l => (
                 <tr key={l.id}>
                   <td>{l.date}</td>
+                  <td>{dayOfWeek(l.date)}</td>
                   <td>{LEAVE_TYPES[l.type] || l.type}</td>
                   <td>{l.days}</td>
                   <td>{l.notes}</td>
@@ -217,7 +228,7 @@ export default function LeaveLog() {
                     <button className="btn btn-small btn-danger" onClick={() => removeLeave(l.id)}>Del</button>
                   </td>
                 </tr>
-              )) : <tr><td colSpan={5} className="muted">No leave entries yet</td></tr>}
+              )) : <tr><td colSpan={6} className="muted">No leave entries yet</td></tr>}
             </tbody>
           </table>
         </div>
@@ -239,7 +250,7 @@ export default function LeaveLog() {
         </form>
       </div>
 
-      <div className="card">
+      <div className="card card--teal">
         <h3>All WFH Entries</h3>
         <input className="table-filter" type="text" placeholder="Filter entries…" value={wfhTable.search} onChange={e => wfhTable.setSearch(e.target.value)} />
         <div className="table-wrap">
@@ -247,6 +258,7 @@ export default function LeaveLog() {
             <thead>
               <tr>
                 <SortableTh label="Date" sortKey="date" activeKey={wfhTable.sortKey} dir={wfhTable.sortDir} onSort={wfhTable.toggleSort} />
+                <SortableTh label="Day" sortKey="day" activeKey={wfhTable.sortKey} dir={wfhTable.sortDir} onSort={wfhTable.toggleSort} />
                 <SortableTh label="Notes" sortKey="notes" activeKey={wfhTable.sortKey} dir={wfhTable.sortDir} onSort={wfhTable.toggleSort} />
                 <th></th>
               </tr>
@@ -255,13 +267,14 @@ export default function LeaveLog() {
               {wfhTable.rows.length ? wfhTable.rows.map(w => (
                 <tr key={w.id}>
                   <td>{w.date}</td>
+                  <td>{dayOfWeek(w.date)}</td>
                   <td>{w.notes}</td>
                   <td className="row-actions">
                     <button className="btn btn-small" onClick={() => editWfh(w)}>Edit</button>
                     <button className="btn btn-small btn-danger" onClick={() => removeWfh(w.id)}>Del</button>
                   </td>
                 </tr>
-              )) : <tr><td colSpan={3} className="muted">No WFH entries yet</td></tr>}
+              )) : <tr><td colSpan={4} className="muted">No WFH entries yet</td></tr>}
             </tbody>
           </table>
         </div>
