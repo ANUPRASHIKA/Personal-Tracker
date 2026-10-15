@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const OPS = {
   '+': (a, b) => a + b,
@@ -14,6 +14,10 @@ export default function Calculator() {
   const [prev, setPrev] = useState(null);
   const [operator, setOperator] = useState(null);
   const [waiting, setWaiting] = useState(false);
+  const rootRef = useRef(null);
+
+  // Auto-focus on mount so keyboard input works immediately without clicking inside first.
+  useEffect(() => { rootRef.current?.focus(); }, []);
 
   function inputDigit(d) {
     if (waiting) { setDisplay(d); setWaiting(false); return; }
@@ -35,8 +39,20 @@ export default function Calculator() {
   }
 
   function percent() {
-    setDisplay(String(Number(display) / 100));
+    const value = Number(display);
+    // With a pending +/- op, "%" means a percentage OF the first operand (e.g. 200 - 10% = 200 - 20),
+    // matching standard calculator behavior. Otherwise (×/÷ or no pending op) it's just value/100.
+    if (prev != null && (operator === '+' || operator === '-')) {
+      setDisplay(String((prev * value) / 100));
+    } else {
+      setDisplay(String(value / 100));
+    }
     setWaiting(false);
+  }
+
+  function backspace() {
+    if (waiting) return;
+    setDisplay(display.length > 1 ? display.slice(0, -1) : '0');
   }
 
   function applyPending(nextValue) {
@@ -61,8 +77,21 @@ export default function Calculator() {
     setWaiting(true);
   }
 
+  function handleKeyDown(e) {
+    const { key } = e;
+    if (/^[0-9]$/.test(key)) { inputDigit(key); return; }
+    if (key === '.') { inputDecimal(); return; }
+    if (key === '+' || key === '-') { chooseOperator(key); return; }
+    if (key === '*') { chooseOperator('×'); return; }
+    if (key === '/') { e.preventDefault(); chooseOperator('÷'); return; }
+    if (key === '%') { percent(); return; }
+    if (key === 'Enter' || key === '=') { e.preventDefault(); equals(); return; }
+    if (key === 'Escape') { clearAll(); return; }
+    if (key === 'Backspace') { backspace(); }
+  }
+
   return (
-    <div className="calculator">
+    <div className="calculator" tabIndex={0} ref={rootRef} onKeyDown={handleKeyDown}>
       <div className="calc-expression">{prev != null ? `${prev} ${operator}` : ' '}</div>
       <div className="calc-display">{display}</div>
       <div className="calc-grid">

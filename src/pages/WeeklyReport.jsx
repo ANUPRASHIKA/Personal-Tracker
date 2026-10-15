@@ -4,7 +4,7 @@ import CategoryDot from '../components/CategoryDot';
 import { addDays, parseDateStr, startOfWeek, endOfWeek, toDateStr, weekLabel } from '../lib/dates';
 import {
   computeNetMinutes, minutesToHoursLabel, shiftsInRange, sumNetHours, completedShiftsCount,
-  holidaySet, wfhDateSet, rangeWorkdayInfo, targetLabel, weeklyStatus,
+  holidaySet, wfhDateSet, leaveDaysByDate, rangeWorkdayInfo, targetLabel, weeklyStatus,
 } from '../lib/shift';
 import { commutesInRange, sumFare, categoryText, modeText, isOtherExpense } from '../lib/commute';
 import { LEAVE_TYPES } from '../lib/leave';
@@ -22,7 +22,7 @@ export default function WeeklyReport() {
     const weekShifts = shiftsInRange(shifts, s, e);
     const totalHours = sumNetHours(weekShifts);
     const daysWithData = completedShiftsCount(weekShifts);
-    const wkInfo = rangeWorkdayInfo(s, e, holidaySet(holidays), wfhDateSet(wfhLogs));
+    const wkInfo = rangeWorkdayInfo(s, e, holidaySet(holidays), wfhDateSet(wfhLogs), leaveDaysByDate(leaves));
     const status = weeklyStatus(totalHours, wkInfo.workdays);
 
     const weekCommutes = commutesInRange(commutes, s, e);
@@ -78,7 +78,7 @@ export default function WeeklyReport() {
             <span>Total Hours: <strong className="stat-accent-blue">{data.totalHours.toFixed(1)}</strong></span>
             <span>Avg / Day: <strong className="stat-accent-blue">{(data.daysWithData ? data.totalHours / data.daysWithData : 0).toFixed(1)}</strong></span>
             <span className={`badge ${data.daysWithData ? data.status.cls : 'badge-neutral'}`}>{data.daysWithData ? data.status.label : 'No data'}</span>
-            <span className="muted">{targetLabel(data.wkInfo.workdays, data.wkInfo.holidayHits, data.wkInfo.wfhHits)}</span>
+            <span className="muted">{targetLabel(data.wkInfo.workdays, data.wkInfo.holidayHits, data.wkInfo.wfhHits, data.wkInfo.leaveHits)}</span>
           </div>
           <div className="table-wrap">
             <table>

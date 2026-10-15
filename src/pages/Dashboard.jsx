@@ -10,7 +10,7 @@ import {
 } from '../lib/dates';
 import {
   computeNetMinutes, minutesToHoursLabel, shiftsInRange, sumNetHours, completedShiftsCount,
-  holidaySet, wfhDateSet, rangeWorkdayInfo, workdayBand, targetLabel, weeklyStatus,
+  holidaySet, wfhDateSet, leaveDaysByDate, rangeWorkdayInfo, workdayBand, targetLabel, weeklyStatus,
 } from '../lib/shift';
 import {
   commutesInRange, sumFare, groupCommutesByDate, categoryText, modeText, CATEGORY_DOT_COLORS,
@@ -26,6 +26,7 @@ export default function Dashboard() {
     const monthKey = monthKeyOf(today);
     const hset = holidaySet(holidays);
     const wset = wfhDateSet(wfhLogs);
+    const lmap = leaveDaysByDate(leaves);
 
     const todayShift = shifts.find(s => s.date === todayStr());
     const todayMin = todayShift ? computeNetMinutes(todayShift) : null;
@@ -33,20 +34,21 @@ export default function Dashboard() {
     const weekShifts = shiftsInRange(shifts, wkStart, wkEnd);
     const weekHours = sumNetHours(weekShifts);
     const weekHasData = completedShiftsCount(weekShifts) > 0;
-    const wkInfo = rangeWorkdayInfo(wkStart, wkEnd, hset, wset);
+    const wkInfo = rangeWorkdayInfo(wkStart, wkEnd, hset, wset, lmap);
     const wStatus = weeklyStatus(weekHours, wkInfo.workdays);
     const wkBand = workdayBand(wkInfo.workdays);
 
     const monthShifts = shifts.filter(s => s.date.slice(0, 7) === monthKey);
     const weekKeysInMonth = [...new Set(monthShifts.map(s => toDateStr(startOfWeek(parseDateStr(s.date)))))];
     const monthTotalHours = sumNetHours(monthShifts);
-    let monthWorkdays = 0, monthHolidayHits = 0, monthWfhHits = 0;
+    let monthWorkdays = 0, monthHolidayHits = 0, monthWfhHits = 0, monthLeaveHits = 0;
     weekKeysInMonth.forEach(wk => {
       const start = parseDateStr(wk), end = endOfWeek(start);
-      const info = rangeWorkdayInfo(start, end, hset, wset);
+      const info = rangeWorkdayInfo(start, end, hset, wset, lmap);
       monthWorkdays += info.workdays;
       monthHolidayHits += info.holidayHits;
       monthWfhHits += info.wfhHits;
+      monthLeaveHits += info.leaveHits;
     });
     const avgWorkdaysPerWeek = weekKeysInMonth.length ? monthWorkdays / weekKeysInMonth.length : 5;
     const avgPerWeek = weekKeysInMonth.length ? monthTotalHours / weekKeysInMonth.length : 0;
@@ -67,6 +69,7 @@ export default function Dashboard() {
       const notes = [];
       if (wkInfo.holidayHits > 0) notes.push(`${wkInfo.holidayHits} holiday${wkInfo.holidayHits > 1 ? 's' : ''}`);
       if (wkInfo.wfhHits > 0) notes.push(`${wkInfo.wfhHits} WFH day${wkInfo.wfhHits > 1 ? 's' : ''}`);
+      if (wkInfo.leaveHits > 0) notes.push(`${wkInfo.leaveHits} leave day${wkInfo.leaveHits > 1 ? 's' : ''}`);
       const holidayNote = notes.length ? ` (${notes.join(', ')} excluded)` : '';
       bannerText = weekHours < wkBand.low
         ? `⚠ This week's total is ${weekHours.toFixed(1)}h — ${(wkBand.low - weekHours).toFixed(1)}h below the ${wkBand.low.toFixed(1)}–${wkBand.high.toFixed(1)}h target${holidayNote}.`
@@ -76,7 +79,7 @@ export default function Dashboard() {
     return {
       todayMin,
       weekHours, weekHasData, wStatus, wkInfo,
-      avgPerWeek, avgWorkdaysPerWeek, monthHasData, mStatus, monthHolidayHits, monthWfhHits,
+      avgPerWeek, avgWorkdaysPerWeek, monthHasData, mStatus, monthHolidayHits, monthWfhHits, monthLeaveHits,
       weekExpense: sumFare(weekCommutes), monthExpense: sumFare(monthCommutes),
       monthLeaveDays, monthWfhCount, wfhRemaining: wfh.remaining, leaveWarnings,
       bannerText,
@@ -87,12 +90,13 @@ export default function Dashboard() {
     const today = new Date();
     const hset = holidaySet(holidays);
     const wset = wfhDateSet(wfhLogs);
+    const lmap = leaveDaysByDate(leaves);
     const bars = [];
     for (let i = 5; i >= 0; i--) {
       const anchor = addDays(today, -7 * i);
       const s = startOfWeek(anchor), e = endOfWeek(anchor);
       const total = sumNetHours(shiftsInRange(shifts, s, e));
-      const { workdays } = rangeWorkdayInfo(s, e, hset, wset);
+      const { workdays } = rangeWorkdayInfo(s, e, hset, wset, lmap);
       const band = workdayBand(workdays);
       bars.push({
         label: `${s.getMonth() + 1}/${s.getDate()}`,
@@ -102,7 +106,7 @@ export default function Dashboard() {
       });
     }
     return bars;
-  }, [shifts, holidays, wfhLogs]);
+  }, [shifts, holidays, wfhLogs, leaves]);
 
   const expenseBars = useMemo(() => {
     const today = new Date();
@@ -158,7 +162,7 @@ export default function Dashboard() {
           <span className={`badge ${stats.weekHasData ? stats.wStatus.cls : 'badge-neutral'}`}>
             {stats.weekHasData ? stats.wStatus.label : 'No data'}
           </span>
-          <span className="muted">{targetLabel(stats.wkInfo.workdays, stats.wkInfo.holidayHits, stats.wkInfo.wfhHits)}</span>
+          <span className="muted">{targetLabel(stats.wkInfo.workdays, stats.wkInfo.holidayHits, stats.wkInfo.wfhHits, stats.wkInfo.leaveHits)}</span>
         </div>
         <div className="card stat-card">
           <StatIcon icon={TrendingUp} color="#2dd4bf" />
@@ -167,7 +171,7 @@ export default function Dashboard() {
           <span className={`badge ${stats.monthHasData ? stats.mStatus.cls : 'badge-neutral'}`}>
             {stats.monthHasData ? stats.mStatus.label : 'No data'}
           </span>
-          {stats.monthHasData && <span className="muted">{targetLabel(stats.avgWorkdaysPerWeek, 0, stats.monthWfhHits)}</span>}
+          {stats.monthHasData && <span className="muted">{targetLabel(stats.avgWorkdaysPerWeek, 0, stats.monthWfhHits, stats.monthLeaveHits)}</span>}
         </div>
         <div className="card stat-card">
           <StatIcon icon={Wallet} color="#22d3ee" />

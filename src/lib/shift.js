@@ -29,35 +29,45 @@ export function sumNetHours(list) {
 // Only count days that have both punch-in and punch-out when deciding if a status badge should show.
 export function completedShiftsCount(list) { return list.filter(s => computeNetMinutes(s) != null).length; }
 
-// A working day targets 7.2-8h net (36-40h over a 5-day week); holidays and WFH days reduce the expected workdays.
+// A working day targets 7.2-8h net (36-40h over a 5-day week); holidays, WFH days, and leave reduce the expected workdays.
 export function holidaySet(holidays) { return new Set(holidays.map(h => h.date)); }
 export function wfhDateSet(wfhLogs) { return new Set(wfhLogs.map(w => w.date)); }
+// Maps date -> total leave days taken on that date (0.5 for a half day, can exceed 1 if multiple entries).
+export function leaveDaysByDate(leaves) {
+  const map = new Map();
+  leaves.forEach(l => map.set(l.date, (map.get(l.date) || 0) + (Number(l.days) || 0)));
+  return map;
+}
 export function isWeekday(d) { const dow = d.getDay(); return dow >= 1 && dow <= 5; }
 
 // Counts Mon-Fri days in [start, end] (inclusive), split into working days vs. days marked as
-// holidays vs. WFH days (no office Shift Log entry is expected on those, so they don't count either).
-export function rangeWorkdayInfo(start, end, hset, wfhSet = new Set()) {
-  let workdays = 0, holidayHits = 0, wfhHits = 0;
+// holidays vs. WFH days (no office Shift Log entry is expected on those, so they don't count either)
+// vs. days with leave taken (a half-day leave only excludes half a day from the target).
+export function rangeWorkdayInfo(start, end, hset, wfhSet = new Set(), leaveMap = new Map()) {
+  let workdays = 0, holidayHits = 0, wfhHits = 0, leaveHits = 0;
   for (let d = new Date(start); d <= end; d = addDays(d, 1)) {
     if (!isWeekday(d)) continue;
     const ds = toDateStr(d);
     if (hset.has(ds)) { holidayHits++; continue; }
     if (wfhSet.has(ds)) { wfhHits++; continue; }
+    const leaveDays = Math.min(1, leaveMap.get(ds) || 0);
+    if (leaveDays > 0) { workdays += 1 - leaveDays; leaveHits += leaveDays; continue; }
     workdays++;
   }
-  return { workdays, holidayHits, wfhHits };
+  return { workdays, holidayHits, wfhHits, leaveHits };
 }
 
 export function workdayBand(workdays) {
   return { low: workdays * 7.2, high: workdays * 8 };
 }
 
-export function targetLabel(workdays, holidayHits, wfhHits = 0) {
+export function targetLabel(workdays, holidayHits, wfhHits = 0, leaveHits = 0) {
   const { low, high } = workdayBand(workdays);
   const base = `Target ${low.toFixed(1)}–${high.toFixed(1)}h`;
   const notes = [];
   if (holidayHits > 0) notes.push(`${holidayHits} holiday${holidayHits > 1 ? 's' : ''} excluded`);
   if (wfhHits > 0) notes.push(`${wfhHits} WFH day${wfhHits > 1 ? 's' : ''} excluded`);
+  if (leaveHits > 0) notes.push(`${leaveHits} leave day${leaveHits > 1 ? 's' : ''} excluded`);
   return notes.length ? `${base} (${notes.join(', ')})` : base;
 }
 

@@ -116,6 +116,16 @@ export function lastMonths(count, asOf = new Date()) {
   return out;
 }
 
+// All 12 months (Jan-Dec) of the given calendar year, as { monthKey, label } pairs, for trend charts.
+export function monthsOfYear(year = new Date().getFullYear()) {
+  const out = [];
+  for (let m = 0; m < 12; m++) {
+    const d = new Date(year, m, 1);
+    out.push({ monthKey: monthKeyOf(d), label: d.toLocaleString('en-US', { month: 'short' }) });
+  }
+  return out;
+}
+
 // Collapse duplicate leave entries for the same date + type, keeping the most recently saved one.
 export function dedupeLeaves(leaves) {
   const byKey = new Map();

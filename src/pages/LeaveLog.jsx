@@ -4,7 +4,7 @@ import { useToast } from '../context/ToastContext';
 import { uid } from '../lib/id';
 import { todayStr, parseDateStr, DOW_SHORT } from '../lib/dates';
 import {
-  LEAVE_TYPES, computeLeaveBalances, wfhUsage, monthlyWarnings, lastMonths, leaveUsageByType,
+  LEAVE_TYPES, computeLeaveBalances, wfhUsage, monthlyWarnings, monthsOfYear, leaveUsageByType,
   WFH_ANNUAL_CAP, ANNUAL_CARRY_FORWARD_CAP, WFH_MONTHLY_WARN_THRESHOLD, LEAVES_MONTHLY_WARN_THRESHOLD,
 } from '../lib/leave';
 import ComboChart from '../components/ComboChart';
@@ -34,7 +34,7 @@ export default function LeaveLog() {
   const usageTotal = useMemo(() => Object.values(usage).reduce((s, v) => s + v, 0), [usage]);
   const wfh = useMemo(() => wfhUsage(wfhLogs), [wfhLogs]);
   const warnings = useMemo(() => monthlyWarnings(leaves, wfhLogs), [leaves, wfhLogs]);
-  const trendMonths = useMemo(() => lastMonths(6), []);
+  const trendMonths = useMemo(() => monthsOfYear(), []);
 
   const leaveTrendBars = useMemo(() => trendMonths.map(m => {
     const total = leaves.filter(l => l.date.slice(0, 7) === m.monthKey).reduce((s, l) => s + (Number(l.days) || 0), 0);
@@ -149,11 +149,11 @@ export default function LeaveLog() {
 
       <div className="grid-2col">
         <div className="card">
-          <h3>Leave Trend <span className="muted">(last 6 months)</span></h3>
+          <h3>Leave Trend <span className="muted">(this year)</span></h3>
           <ComboChart bars={leaveTrendBars} />
         </div>
         <div className="card">
-          <h3>WFH Trend <span className="muted">(last 6 months)</span></h3>
+          <h3>WFH Trend <span className="muted">(this year)</span></h3>
           <ComboChart bars={wfhTrendBars} />
         </div>
       </div>

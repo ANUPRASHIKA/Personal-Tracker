@@ -170,6 +170,7 @@
   <a href="#interaction">Component Interaction</a>
   <h2>Core Systems</h2>
   <a href="#auth">Authentication</a>
+  <a href="#multiuser">Multi-User Extension</a>
   <a href="#data">Data Layer &amp; Firestore</a>
   <a href="#theme">Theming</a>
   <a href="#sortfilter">Sort &amp; Filter System</a>
@@ -331,6 +332,45 @@ value = {
   signOutUser: () =&gt; signOut(auth),
 };</code></pre>
     <p><code>App.jsx</code> reads <code>loading</code>/<code>user</code> from <code>useAuth()</code> to decide what to render (spinner → sign-in screen → app). Once signed in, <code>user.uid</code> becomes the Firestore document key for all of that person's data.</p>
+
+    <h3>Displaying the logged-in user's details anywhere</h3>
+    <p><code>user</code> is the raw Firebase Auth user object (from Google sign-in), so any component can read its fields directly after calling <code>useAuth()</code> — no extra plumbing needed:</p>
+    <pre><code>import { useAuth } from '../context/AuthContext';
+
+function SomeComponent() {
+  const { user } = useAuth();
+  return (
+    &lt;&gt;
+      {user.photoURL &amp;&amp; &lt;img src={user.photoURL} alt="" /&gt;}
+      &lt;span&gt;{user.displayName || user.email}&lt;/span&gt;
+    &lt;/&gt;
+  );
+}</code></pre>
+    <p>Useful fields on <code>user</code>: <code>displayName</code>, <code>email</code>, <code>photoURL</code>, <code>uid</code>, <code>emailVerified</code>, <code>metadata.creationTime</code> / <code>metadata.lastSignInTime</code>.</p>
+    <p class="muted"><code>Header.jsx</code> is the one exception to "just call <code>useAuth()</code>" — it receives <code>user</code>/<code>onSignOut</code> as props from <code>AppShell</code> instead, since <code>AppShell</code> already needs the auth state for the sign-in gate (see the Component Interaction Map section for why).</p>
+  </section>
+
+  <section id="multiuser">
+    <h2><span class="dot" style="background:var(--bad)"></span>Multi-User Extension (viewing someone else's data)</h2>
+    <p>Today the app is strictly single-tenant: each signed-in user can only ever read/write their own Firestore document (<code>users/{uid}</code>), enforced by the security rule in the <a href="#firebase" class="inline">Firebase Setup</a> section. There is <strong>no built-in way</strong> to look up or display another user's data by email, and that's intentional — enabling it requires a deliberate access-control design, not a quick tweak.</p>
+    <h3>Why you can't just "look up by email" today</h3>
+    <ul>
+      <li>Firestore documents are keyed by <code>uid</code>, not email — there's no query path from an email string to a document.</li>
+      <li>The Firebase <em>client</em> SDK has no API to resolve an email to a <code>uid</code> (that's an admin-only operation, <code>admin.auth().getUserByEmail()</code>, to prevent user-enumeration attacks).</li>
+      <li>Even with a <code>uid</code> in hand, the current security rule (<code>request.auth.uid == userId</code>) would reject the read.</li>
+    </ul>
+    <h3>How to extend it properly (a "sharing" feature)</h3>
+    <ol>
+      <li><strong>Email → uid index:</strong> a separate top-level collection, e.g. <code>emailIndex/{email}: { uid }</code>, written once at sign-up. Security rule allows any authenticated user to <em>read</em> this collection (but only write their own entry), so the client can resolve an email the owner wants to share with.</li>
+      <li><strong>Consent field on the owner's document:</strong> add <code>sharedWith: [uid1, uid2, ...]</code> inside <code>users/{uid}</code>, managed via a new <code>updateSharedWith()</code> method in <code>DataContext</code> (same pattern as <code>updateLeaveSettings</code>).</li>
+      <li><strong>Updated security rule:</strong>
+        <pre><code>allow read: if request.auth.uid == userId
+  || request.auth.uid in resource.data.sharedWith;</code></pre>
+      </li>
+      <li><strong>Parameterize the data hook:</strong> <code>useUserData(uid)</code> already takes a <code>uid</code> argument — the only change needed is letting <code>DataProvider</code> accept an optional "viewing uid" (defaulting to the signed-in user's own) so a page can say "load this other person's document instead".</li>
+      <li><strong>UI:</strong> an "Invite by email" control in Settings (writes to <code>sharedWith</code> after resolving via <code>emailIndex</code>), plus some way to switch between "my data" and "shared-with-me" views (e.g. a dropdown in the sidebar).</li>
+    </ol>
+    <p class="muted">Keep any shared view read-only unless you also design write-conflict handling — two people editing the same shift/leave data concurrently is its own problem this app doesn't currently solve.</p>
   </section>
 
   <section id="data">
@@ -500,7 +540,8 @@ th { background: color-mix(in srgb, var(--card-accent, var(--accent)) 14%, trans
     <ul>
       <li><code>wfhUsage(wfhLogs)</code> → <code>{ usedThisYear, usedThisMonth, remaining }</code> against the 26/year cap.</li>
       <li><code>leaveUsageByType(leaves)</code> → days availed per type this year, feeds the "Leave Days Availed by Category" table.</li>
-      <li><code>lastMonths(6)</code> → used to build the 6-month trend <code>ComboChart</code>s (Leave Trend, WFH Trend).</li>
+      <li><code>lastMonths(6)</code> → rolling 6-month helper, kept for reuse elsewhere.</li>
+      <li><code>monthsOfYear(year)</code> → all 12 months (Jan–Dec) of a calendar year; used to build the Leave Trend / WFH Trend <code>ComboChart</code>s so they show the <strong>whole current year</strong> rather than a rolling window.</li>
     </ul>
     <p class="muted">Both the Leave entries table and the WFH entries table include a <strong>Day</strong> column (Mon–Sun) right after Date, computed via a small <code>dayOfWeek(date)</code> helper in <code>LeaveLog.jsx</code> (<code>DOW_SHORT[(parseDateStr(date).getDay() + 6) % 7]</code>) — the same pattern Settings uses for the Holidays table. It's wired into both <code>useSortFilter</code> calls so it's sortable and included in the free-text filter.</p>
   </section>
@@ -567,7 +608,7 @@ th { background: color-mix(in srgb, var(--card-accent, var(--accent)) 14%, trans
     <table>
       <tr><th>Component</th><th>What it does</th></tr>
       <tr><td><code>Header.jsx</code></td><td>The left sidebar nav (icons via <code>lucide-react</code>, one fixed color per tab), brand + theme toggle + quick calculator toggle, and the signed-in user menu with Sign Out. Collapses to a horizontal scrollable bar on screens ≤800px.</td></tr>
-      <tr><td><code>Calculator.jsx</code></td><td>Self-contained 4-function calculator (no <code>eval()</code> — a small reducer-style state machine) with chained operations, sign toggle, percent, and clear. Rendered inside a floating popover (<code>.calc-popover</code>) anchored to the sidebar's calculator button; toggled open/closed via <code>showCalc</code> state in <code>Header.jsx</code>. Shows a small expression line (e.g. "5 +") above the main display so the pending operand/operator stays visible while typing the next number.</td></tr>
+      <tr><td><code>Calculator.jsx</code></td><td>Self-contained 4-function calculator (no <code>eval()</code> — a small reducer-style state machine) with chained operations, sign toggle, percent, and clear. Rendered inside a floating popover (<code>.calc-popover</code>) anchored to the sidebar's calculator button; toggled open/closed via <code>showCalc</code> state in <code>Header.jsx</code>. Shows a small expression line (e.g. "5 +") above the main display so the pending operand/operator stays visible while typing the next number. Auto-focuses on open and supports full keyboard input (digits, <code>+ - * /</code>, <code>.</code>, <code>%</code>, <code>Enter</code>/<code>=</code>, <code>Backspace</code>, <code>Escape</code>). <code>%</code> follows standard calculator convention: with a pending <code>+</code>/<code>-</code>, it's a percentage <em>of the first operand</em> (e.g. <code>200 - 10% = 180</code>); otherwise it's just value/100.</td></tr>
       <tr><td><code>QuickPunch.jsx</code></td><td>Dashboard widget for one-tap punch in/out (see Shift Log section).</td></tr>
       <tr><td><code>StatIcon.jsx</code></td><td>Renders a colored circular icon badge: <code>&lt;StatIcon icon={Clock} color="#8b5cf6" /&gt;</code>. Background is the color at ~13% opacity (hex + alpha suffix trick).</td></tr>
       <tr><td><code>Badge.jsx</code></td><td>Thin wrapper for the <code>.badge</code> CSS classes (<code>badge-good</code>/<code>badge-warn</code>/<code>badge-bad</code>/<code>badge-neutral</code>).</td></tr>

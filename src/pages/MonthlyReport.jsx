@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useData } from '../context/DataContext';
 import { addMonthsFn, parseDateStr, startOfWeek, endOfWeek, toDateStr, monthKeyOf, monthLabel, weekLabel } from '../lib/dates';
 import {
-  sumNetHours, completedShiftsCount, holidaySet, wfhDateSet, rangeWorkdayInfo, targetLabel, weeklyStatus,
+  sumNetHours, completedShiftsCount, holidaySet, wfhDateSet, leaveDaysByDate, rangeWorkdayInfo, targetLabel, weeklyStatus,
 } from '../lib/shift';
 import { sumFare, isOtherExpense, categoryText } from '../lib/commute';
 import { LEAVE_TYPES } from '../lib/leave';
@@ -30,13 +30,15 @@ export default function MonthlyReport() {
     const weekKeys = [...weekMap.keys()].sort();
     const hset = holidaySet(holidays);
     const wset = wfhDateSet(wfhLogs);
+    const lmap = leaveDaysByDate(leaves);
     const weekInfos = weekKeys.map(wk => {
       const start = parseDateStr(wk), end = endOfWeek(start);
-      return rangeWorkdayInfo(start, end, hset, wset);
+      return rangeWorkdayInfo(start, end, hset, wset, lmap);
     });
     const totalWorkdays = weekInfos.reduce((sum, i) => sum + i.workdays, 0);
     const totalHolidayHits = weekInfos.reduce((sum, i) => sum + i.holidayHits, 0);
     const totalWfhHits = weekInfos.reduce((sum, i) => sum + i.wfhHits, 0);
+    const totalLeaveHits = weekInfos.reduce((sum, i) => sum + i.leaveHits, 0);
     const avgWorkdaysPerWeek = weekKeys.length ? totalWorkdays / weekKeys.length : 5;
     const avgPerWeek = weekKeys.length ? totalHours / weekKeys.length : 0;
     const hasData = completedShiftsCount(monthShifts) > 0;
@@ -105,7 +107,7 @@ export default function MonthlyReport() {
     });
 
     return {
-      monthShifts, totalHours, avgPerWeek, avgWorkdaysPerWeek, hasData, status, totalHolidayHits, totalWfhHits, weekRows,
+      monthShifts, totalHours, avgPerWeek, avgWorkdaysPerWeek, hasData, status, totalHolidayHits, totalWfhHits, totalLeaveHits, weekRows,
       monthCommutes, monthTrips, monthExpenses, tripWeekRows, expenseWeekRows, expensesByCategory,
       tripTotal: sumFare(monthTrips), expenseTotal: sumFare(monthExpenses),
       monthLeaves, monthWfh, leaveDaysTotal, leaveWeekRows, wfhWeekRows,
@@ -135,7 +137,7 @@ export default function MonthlyReport() {
             <span>Total Hours: <strong className="stat-accent-blue">{data.totalHours.toFixed(1)}</strong></span>
             <span>Avg / Week: <strong className="stat-accent-blue">{data.avgPerWeek.toFixed(1)}</strong></span>
             <span className={`badge ${data.hasData ? data.status.cls : 'badge-neutral'}`}>{data.hasData ? data.status.label : 'No data'}</span>
-            {data.hasData && <span className="muted">{targetLabel(data.avgWorkdaysPerWeek, data.totalHolidayHits, data.totalWfhHits)}</span>}
+            {data.hasData && <span className="muted">{targetLabel(data.avgWorkdaysPerWeek, data.totalHolidayHits, data.totalWfhHits, data.totalLeaveHits)}</span>}
           </div>
           <div className="table-wrap">
             <table>
